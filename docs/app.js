@@ -5,7 +5,7 @@ import {
   normalizeRow,
   summarizeFeedback,
   uniqueModels,
-} from "../lib/domain.mjs";
+} from "./lib/domain.mjs";
 import { parseCsv } from "./lib/csv.mjs";
 
 const SHEET_CSV_URL =
