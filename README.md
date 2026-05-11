@@ -59,3 +59,4 @@ To publish:
 4. After deployment, Vercel will give you a public URL such as `https://your-project.vercel.app`.
 
 The Google Sheet must be readable as CSV for the public dashboard to show data. Viewers will not see a Google Sheet button, but the feedback data displayed in the dashboard is public to anyone with the dashboard URL.
+Deployment trigger.
