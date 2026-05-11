@@ -1,0 +1,9 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/feedback",
+      "destination": "/api/feedback.mjs"
+    }
+  ]
+}
