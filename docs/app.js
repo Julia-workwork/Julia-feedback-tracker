@@ -77,11 +77,21 @@ function renderSummary(records) {
     .join("");
 }
 
+function categoryPillsTemplate(record) {
+  if (!record.categories.length) {
+    return `<span class="category-pill category-unknown">Uncategorized</span>`;
+  }
+
+  return record.categories
+    .map((category) => `<span class="category-pill ${categoryClass(category)}">${escapeHtml(category)}</span>`)
+    .join("");
+}
+
 function cardTemplate(record, index) {
   return `
     <button class="feedback-card" type="button" data-index="${index}">
       <div class="card-meta">
-        <span class="category-pill ${categoryClass(record.updateCategory)}">${escapeHtml(record.updateCategory || "Uncategorized")}</span>
+        ${categoryPillsTemplate(record)}
         ${record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : ""}
       </div>
       <h3>${escapeHtml(record.keyPoints || record.upgradeRequirements || "No summary")}</h3>
@@ -132,7 +142,7 @@ function openDetail(record) {
   elements.detail.innerHTML = `
     <div class="detail-panel__header">
       <div>
-        <span class="category-pill ${categoryClass(record.updateCategory)}">${escapeHtml(record.updateCategory)}</span>
+        <div class="card-meta">${categoryPillsTemplate(record)}</div>
         <h2>${escapeHtml(record.keyPoints || "Feedback detail")}</h2>
       </div>
       <button type="button" id="close-detail">Close</button>
