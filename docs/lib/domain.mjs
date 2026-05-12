@@ -1,4 +1,13 @@
-export const CATEGORY_ORDER = ["BUG", "Feature Request", "Feature Enhancement", "CPS", "APP"];
+export const CATEGORY_ORDER = [
+  "BUG",
+  "Feature Request",
+  "Feature Enhancement",
+  "Positive review",
+  "Negative review",
+  "CPS",
+  "APP",
+];
+
 
 export const STATUS_LABELS = {
   todo: "To Submit",
@@ -30,7 +39,9 @@ export function categoryClass(input) {
   const primary = parseCategories(input)[0];
   if (primary === "BUG") return "category-bug";
   if (primary === "Feature Request") return "category-feature-request";
-  if (primary === "Feature Enhancement") return "category-feature-enhancement";
+   if (primary === "Feature Enhancement") return "category-feature-enhancement";
+  if (primary === "Positive review") return "category-positive-review";
+  if (primary === "Negative review") return "category-negative-review";
   if (primary === "CPS") return "category-cps";
   if (primary === "APP") return "category-app";
   return "category-unknown";
@@ -138,6 +149,8 @@ export function summarizeFeedback(records) {
     BUG: 0,
     "Feature Request": 0,
     "Feature Enhancement": 0,
+    "Positive review": 0,
+    "Negative review": 0,
     CPS: 0,
     APP: 0,
   };
