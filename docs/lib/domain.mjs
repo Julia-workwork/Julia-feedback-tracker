@@ -2,10 +2,10 @@ export const CATEGORY_ORDER = [
   "BUG",
   "Feature Request",
   "Feature Enhancement",
-  "Positive review",
-  "Negative review",
   "CPS",
   "APP",
+  "Positive review",
+  "Negative review",
 ];
 
 
