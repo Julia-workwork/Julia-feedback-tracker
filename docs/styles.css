@@ -236,8 +236,24 @@ body {
   background: #d9ead3;
 }
 
+.category-feature-enhancement {
+  background: #cfe2f3;
+}
+
+.category-cps {
+  background: #fff2cc;
+}
+
 .category-app {
   background: #fce5cd;
+}
+
+.category-positive-review {
+  background: #d0eadf;
+}
+
+.category-negative-review {
+  background: #f9d6cf;
 }
 
 .category-unknown {
