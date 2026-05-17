@@ -3,13 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HAM Feedback Follow-up Dashboard</title>
+    <title>Engineering Follow-up Dashboard</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="app-header">
-        <div>
+        <nav class="hero-nav" aria-label="Dashboard sections">
+          <span>Overview</span>
+          <span>Sheet Sync <b aria-hidden="true"></b></span>
+          <span>Julia</span>
+        </nav>
+        <div class="hero-copy">
           <p class="eyebrow">Julia's Feedback Tracker</p>
           <h1>Engineering Follow-up Dashboard</h1>
           <p class="private-note">Private internal tool owned by Julia. Personal workflow only.</p>
@@ -34,10 +39,10 @@
             <option value="BUG">BUG</option>
             <option value="Feature Request">Feature Request</option>
             <option value="Feature Enhancement">Feature Enhancement</option>
-            <option value="CPS">CPS</option>
-            <option value="APP">APP</option>
             <option value="Positive review">Positive review</option>
             <option value="Negative review">Negative review</option>
+            <option value="CPS">CPS</option>
+            <option value="APP">APP</option>
           </select>
         </label>
         <label>
@@ -63,8 +68,8 @@
         <button id="refresh-button" type="button">Refresh</button>
       </section>
 
-      <p id="state-message" class="state-message">Loading Google Sheets data...</p>
       <section id="summary" class="summary-strip" aria-label="Feedback summary"></section>
+      <p id="state-message" class="state-message">Loading Google Sheets data...</p>
       <section id="board" class="status-board" aria-label="Engineering follow-up board"></section>
       <footer class="app-footer">
         © 2026 Julia. All rights reserved. This dashboard is a personal internal tool created for Julia's private workflow. It may not be copied, redistributed, commercialized, or used by any third party without permission.

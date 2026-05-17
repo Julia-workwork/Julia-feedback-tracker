@@ -6,10 +6,9 @@ import {
   summarizeFeedback,
   uniqueModels,
 } from "./lib/domain.mjs";
-import { parseCsv } from "./lib/csv.mjs";
 
-const SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE/export?format=csv&gid=1702171693";
+const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
+const SHEET_GID = "1702171693";
 
 const state = {
   records: [],
@@ -65,15 +64,18 @@ function renderModelOptions() {
 function renderSummary(records) {
   const summary = summarizeFeedback(records);
   const items = [
-    ["Total", summary.total],
-    ["To Submit", summary.statusCounts.todo],
-    ["Submitted", summary.statusCounts.submitted],
-    ["In Progress", summary.statusCounts.inProgress],
-    ["Resolved", summary.statusCounts.resolved],
-    ["Unresolved BUG", summary.unresolvedBugs],
+    ["Total", summary.total, "summary-total"],
+    ["To Submit", summary.statusCounts.todo, "summary-todo"],
+    ["Submitted", summary.statusCounts.submitted, "summary-submitted"],
+    ["In Progress", summary.statusCounts.inProgress, "summary-progress"],
+    ["Resolved", summary.statusCounts.resolved, "summary-resolved"],
+    ["Unresolved BUG", summary.unresolvedBugs, "summary-bug"],
   ];
   elements.summary.innerHTML = items
-    .map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`)
+    .map(
+      ([label, value, className]) =>
+        `<div class="${className}"><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`,
+    )
     .join("");
 }
 
@@ -111,7 +113,7 @@ function renderBoard(records) {
     .map((status) => {
       const items = records.filter((record) => record.status === status);
       return `
-        <article class="status-column">
+        <article class="status-column" data-status="${status}">
           <header><h2>${STATUS_LABELS[status]}</h2><span>${items.length}</span></header>
           <div class="card-list">
             ${
@@ -175,18 +177,54 @@ function render() {
   setMessage(filtered.length ? "" : "No feedback matches the selected filters.");
 }
 
+function loadSheetRows() {
+  return new Promise((resolve, reject) => {
+    const callbackName = `handleFeedbackSheet_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const query = new URLSearchParams({
+      gid: SHEET_GID,
+      tq: "select *",
+      tqx: `out:json;responseHandler:${callbackName}`,
+    });
+    script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${query.toString()}`;
+
+    window[callbackName] = (payload) => {
+      delete window[callbackName];
+      script.remove();
+
+      if (payload.status !== "ok") {
+        reject(new Error("Google Sheet is not publicly readable. Please share it as Anyone with the link can view."));
+        return;
+      }
+
+      const headers = payload.table.cols.map((column) => column.label || column.id).filter(Boolean);
+      const rows = payload.table.rows.map((row) => {
+        const record = {};
+        headers.forEach((header, index) => {
+          const cell = row.c[index];
+          record[header] = cell ? String(cell.f ?? cell.v ?? "").trim() : "";
+        });
+        return record;
+      });
+      resolve(rows);
+    };
+
+    script.addEventListener("error", () => {
+      delete window[callbackName];
+      script.remove();
+      reject(new Error("Unable to load Google Sheets data."));
+    });
+
+    document.head.append(script);
+  });
+}
+
 async function load() {
   setMessage("Loading Google Sheets data...");
-  elements.summary.innerHTML = "";
+  renderSummary([]);
   elements.board.innerHTML = "";
   try {
-    const response = await fetch(SHEET_CSV_URL);
-    if (!response.ok) {
-      throw new Error(
-        "Google Sheet is not publicly readable as CSV. Share it as Anyone with the link can view, or publish it as CSV.",
-      );
-    }
-    state.records = parseCsv(await response.text()).map(normalizeRow);
+    state.records = (await loadSheetRows()).map(normalizeRow);
     renderModelOptions();
     render();
   } catch (error) {
