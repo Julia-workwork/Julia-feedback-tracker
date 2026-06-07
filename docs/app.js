@@ -9,6 +9,23 @@ import {
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const SHEET_GID = "1702171693";
+const EXPECTED_SHEET_HEADERS = new Set([
+  "Date",
+  "Model",
+  "ID",
+  "Email",
+  "Profile",
+  "Update Category",
+  "Key Points",
+  "Upgrade requirements",
+  "Chinese",
+  "Notes",
+  "Request number",
+  "ING",
+  "Priority",
+  "DONE",
+  "Channel",
+]);
 
 const state = {
   records: [],
@@ -277,7 +294,53 @@ function render() {
   const visibleRecords = applySummaryFilter(filtered);
   renderSummary(filtered);
   renderBoard(visibleRecords);
+  if (!state.records.length) {
+    setMessage("Google Sheet loaded, but no feedback rows were found. Please check the sheet tab and headers.", true);
+    return;
+  }
   setMessage(visibleRecords.length ? "" : "No feedback matches the selected filters.");
+}
+
+function sheetCellValue(row, index) {
+  const cell = row.c[index];
+  return cell ? String(cell.f ?? cell.v ?? "").trim() : "";
+}
+
+function hasAnyValue(record) {
+  return Object.values(record).some(Boolean);
+}
+
+function buildRecordsFromHeaders(tableRows, headers) {
+  return tableRows
+    .map((row) => {
+      const record = {};
+      headers.forEach((header, index) => {
+        if (!header) return;
+        record[header] = sheetCellValue(row, index);
+      });
+      return record;
+    })
+    .filter(hasAnyValue);
+}
+
+function tableRowsToRecords(table) {
+  const labels = table.cols.map((column) => String(column.label || "").trim());
+  const ids = table.cols.map((column) => String(column.id || "").trim());
+  const labelsHaveExpectedHeaders = labels.some((label) => EXPECTED_SHEET_HEADERS.has(label));
+  const headers = labelsHaveExpectedHeaders ? labels : ids;
+  const parsedRecords = buildRecordsFromHeaders(table.rows, headers);
+
+  if (headers.some((header) => EXPECTED_SHEET_HEADERS.has(header))) {
+    return parsedRecords;
+  }
+
+  const firstRowHeaders = table.rows[0]?.c.map((_, index) => sheetCellValue(table.rows[0], index)) || [];
+  const firstRowHasExpectedHeaders = firstRowHeaders.some((header) => EXPECTED_SHEET_HEADERS.has(header));
+  if (firstRowHasExpectedHeaders) {
+    return buildRecordsFromHeaders(table.rows.slice(1), firstRowHeaders);
+  }
+
+  return parsedRecords;
 }
 
 function loadSheetRows() {
@@ -300,16 +363,7 @@ function loadSheetRows() {
         return;
       }
 
-      const headers = payload.table.cols.map((column) => column.label || column.id).filter(Boolean);
-      const rows = payload.table.rows.map((row) => {
-        const record = {};
-        headers.forEach((header, index) => {
-          const cell = row.c[index];
-          record[header] = cell ? String(cell.f ?? cell.v ?? "").trim() : "";
-        });
-        return record;
-      });
-      resolve(rows);
+      resolve(tableRowsToRecords(payload.table));
     };
 
     script.addEventListener("error", () => {
