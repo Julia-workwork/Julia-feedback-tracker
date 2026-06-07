@@ -27,6 +27,9 @@ const SHEET_HEADERS_BY_POSITION = [
   "DONE",
   "Channel",
   "Dashboard Status",
+  "Last Modified At",
+  "Last Modified By",
+  "Status Change Log",
 ];
 const EXPECTED_SHEET_HEADERS = new Set([
   ...SHEET_HEADERS_BY_POSITION,
@@ -270,7 +273,7 @@ function recordMatchPayload(record) {
   };
 }
 
-function syncStatusToGoogleSheet(record, nextStatus) {
+function syncChangesToGoogleSheet(record, changes) {
   return new Promise((resolve, reject) => {
     if (!GOOGLE_APPS_SCRIPT_URL) {
       reject(new Error("Google Apps Script URL is not configured yet."));
@@ -281,7 +284,7 @@ function syncStatusToGoogleSheet(record, nextStatus) {
     const script = document.createElement("script");
     const query = new URLSearchParams({
       callback: callbackName,
-      status: STATUS_LABELS[nextStatus],
+      changes: JSON.stringify(changes),
       match: JSON.stringify(recordMatchPayload(record)),
     });
     const separator = GOOGLE_APPS_SCRIPT_URL.includes("?") ? "&" : "?";
@@ -310,24 +313,35 @@ function syncStatusToGoogleSheet(record, nextStatus) {
   });
 }
 
-async function updateRecordStatus(record, nextStatus, options = {}) {
+async function saveRecordChanges(record, changes) {
   showToast("Updating Google Sheet...");
   try {
-    await syncStatusToGoogleSheet(record, nextStatus);
-    record.status = nextStatus;
-    record.dashboardStatus = STATUS_LABELS[nextStatus];
-    if (options.keepDetailOpen) {
-      const filtered = filterFeedback(state.records, state.filters);
-      renderSummary(filtered);
-      renderBoard(applySummaryFilter(filtered));
-      setMessage("");
-    } else {
-      render();
-    }
-    showToast("Google Sheet status updated");
+    const result = await syncChangesToGoogleSheet(record, changes);
+    applySavedChanges(record, changes, result);
+    const filtered = filterFeedback(state.records, state.filters);
+    renderSummary(filtered);
+    renderBoard(applySummaryFilter(filtered));
+    setMessage("");
+    openDetail(record);
+    showToast("Google Sheet updated");
   } catch (error) {
-    showToast(error instanceof Error ? error.message : "Status update failed");
+    showToast(error instanceof Error ? error.message : "Update failed");
   }
+}
+
+function applySavedChanges(record, changes, result = {}) {
+  if (changes["Dashboard Status"] !== undefined) {
+    record.dashboardStatus = changes["Dashboard Status"];
+    record.status = Object.entries(STATUS_LABELS).find(([, label]) => label === changes["Dashboard Status"])?.[0] || record.status;
+  }
+  if (changes.Priority !== undefined) record.priority = changes.Priority;
+  if (changes.Notes !== undefined) record.notes = changes.Notes;
+  if (changes["Request number"] !== undefined) record.requestNumber = changes["Request number"];
+  if (changes.ING !== undefined) record.ing = changes.ING;
+  if (changes.DONE !== undefined) record.done = changes.DONE;
+  if (result.lastModifiedAt) record.lastModifiedAt = result.lastModifiedAt;
+  if (result.lastModifiedBy) record.lastModifiedBy = result.lastModifiedBy;
+  if (result.statusChangeLog !== undefined) record.statusChangeLog = result.statusChangeLog;
 }
 
 function detailRow(label, value) {
@@ -336,9 +350,9 @@ function detailRow(label, value) {
 
 function statusSelectTemplate(record) {
   return `
-    <label class="detail-status-control">
+    <label class="detail-field">
       Status
-      <select id="detail-status-select">
+      <select name="Dashboard Status">
         ${Object.entries(STATUS_LABELS)
           .map(
             ([status, label]) =>
@@ -350,6 +364,91 @@ function statusSelectTemplate(record) {
   `;
 }
 
+function editableFieldsTemplate(record) {
+  return `
+    <section class="detail-edit-section" aria-label="Editable follow-up fields">
+      <h3>Editable Follow-up</h3>
+      <div class="detail-edit-grid">
+        ${statusSelectTemplate(record)}
+        <label class="detail-field">
+          Priority
+          <select name="Priority">
+            ${["", "P0", "P1", "P2"]
+              .map((priority) => `<option value="${priority}"${record.priority === priority ? " selected" : ""}>${priority || "-"}</option>`)
+              .join("")}
+          </select>
+        </label>
+        <label class="detail-field">
+          Request number
+          <input name="Request number" value="${escapeHtml(record.requestNumber)}" />
+        </label>
+        <label class="detail-field">
+          ING
+          <input name="ING" value="${escapeHtml(record.ing)}" />
+        </label>
+        <label class="detail-field">
+          DONE
+          <select name="DONE">
+            ${["", "No", "Yes"]
+              .map((done) => `<option value="${done}"${record.done === done ? " selected" : ""}>${done || "-"}</option>`)
+              .join("")}
+          </select>
+        </label>
+        <label class="detail-field detail-field--wide">
+          Notes
+          <textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>
+        </label>
+      </div>
+      <button class="save-detail-changes" type="button">Save Changes</button>
+    </section>
+  `;
+}
+
+function fieldValuesFromDetail() {
+  const fields = elements.detail.querySelectorAll("[name]");
+  return [...fields].reduce((values, field) => {
+    values[field.name] = field.value.trim();
+    return values;
+  }, {});
+}
+
+function originalEditableValues(record) {
+  return {
+    "Dashboard Status": STATUS_LABELS[record.status] || "",
+    Priority: record.priority,
+    Notes: record.notes,
+    "Request number": record.requestNumber,
+    ING: record.ing,
+    DONE: record.done,
+  };
+}
+
+function changedFields(record) {
+  const current = fieldValuesFromDetail();
+  const original = originalEditableValues(record);
+  return Object.entries(current).reduce((changes, [field, value]) => {
+    if ((original[field] || "") !== value) {
+      changes[field] = value;
+    }
+    return changes;
+  }, {});
+}
+
+function changesSummary(record, changes) {
+  const original = originalEditableValues(record);
+  return Object.entries(changes)
+    .map(([field, value]) => `${field}: ${original[field] || "-"} -> ${value || "-"}`)
+    .join("\n");
+}
+
+function modificationRowsTemplate(record) {
+  return `
+    ${detailRow("Last Modified At", record.lastModifiedAt)}
+    ${detailRow("Last Modified By", record.lastModifiedBy)}
+    ${detailRow("Status Change Log", record.statusChangeLog)}
+  `;
+}
+
 function openDetail(record) {
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
@@ -358,7 +457,6 @@ function openDetail(record) {
       <div>
         <div class="card-meta">${categoryPillsTemplate(record)}</div>
         <h2>${escapeHtml(record.keyPoints || "Feedback detail")}</h2>
-        ${statusSelectTemplate(record)}
       </div>
       <div class="detail-actions">
         <button class="copy-detail-summary" type="button">Copy Engineer Summary</button>
@@ -376,21 +474,26 @@ function openDetail(record) {
       ${detailRow("Request number", record.requestNumber)}
       ${detailRow("ING", record.ing)}
       ${detailRow("DONE", record.done)}
+      ${modificationRowsTemplate(record)}
       ${detailRow("Upgrade requirements", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
       ${detailRow("Notes", record.notes)}
     </dl>
+    ${editableFieldsTemplate(record)}
   `;
   document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
     await copyEngineerSummary(record);
     showToast("Engineer summary copied");
   });
-  document.querySelector("#detail-status-select").addEventListener("change", async (event) => {
-    const nextStatus = event.target.value;
-    if (!nextStatus || record.status === nextStatus) return;
-    event.target.disabled = true;
-    await updateRecordStatus(record, nextStatus, { keepDetailOpen: true });
-    event.target.disabled = false;
+  document.querySelector(".save-detail-changes").addEventListener("click", async () => {
+    const changes = changedFields(record);
+    if (!Object.keys(changes).length) {
+      showToast("No changes to save");
+      return;
+    }
+    const confirmed = window.confirm(`Confirm changes?\n\n${changesSummary(record, changes)}`);
+    if (!confirmed) return;
+    await saveRecordChanges(record, changes);
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
     elements.detail.classList.add("is-hidden");

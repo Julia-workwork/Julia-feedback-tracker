@@ -2,12 +2,11 @@ export const CATEGORY_ORDER = [
   "BUG",
   "Feature Request",
   "Feature Enhancement",
-  "CPS",
-  "APP",
   "Positive review",
   "Negative review",
+  "CPS",
+  "APP",
 ];
-
 
 export const STATUS_LABELS = {
   todo: "To Submit",
@@ -16,11 +15,20 @@ export const STATUS_LABELS = {
   resolved: "Resolved",
 };
 
+export const STATUS_BY_LABEL = {
+  "To Submit": "todo",
+  Submitted: "submitted",
+  "In Progress": "inProgress",
+  Resolved: "resolved",
+};
+
 export function clean(value) {
   return String(value ?? "").trim();
 }
 
 export function deriveStatus(row) {
+  const dashboardStatus = STATUS_BY_LABEL[clean(row["Dashboard Status"])];
+  if (dashboardStatus) return dashboardStatus;
   if (clean(row.DONE).toLowerCase() === "yes") return "resolved";
   if (clean(row.ING)) return "inProgress";
   if (clean(row["Request number"])) return "submitted";
@@ -39,7 +47,7 @@ export function categoryClass(input) {
   const primary = parseCategories(input)[0];
   if (primary === "BUG") return "category-bug";
   if (primary === "Feature Request") return "category-feature-request";
-   if (primary === "Feature Enhancement") return "category-feature-enhancement";
+  if (primary === "Feature Enhancement") return "category-feature-enhancement";
   if (primary === "Positive review") return "category-positive-review";
   if (primary === "Negative review") return "category-negative-review";
   if (primary === "CPS") return "category-cps";
@@ -68,6 +76,10 @@ export function normalizeRow(row) {
     priority: clean(row.Priority),
     done: clean(row.DONE),
     channel: clean(row.Channel),
+    dashboardStatus: clean(row["Dashboard Status"]),
+    lastModifiedAt: clean(row["Last Modified At"]),
+    lastModifiedBy: clean(row["Last Modified By"]),
+    statusChangeLog: clean(row["Status Change Log"]),
     status: deriveStatus(row),
   };
 }
