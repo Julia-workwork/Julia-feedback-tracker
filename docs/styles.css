@@ -654,6 +654,11 @@ body.detail-open {
   font-weight: 900;
 }
 
+.save-detail-changes:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 .detail-actions {
   display: flex;
   flex-shrink: 0;

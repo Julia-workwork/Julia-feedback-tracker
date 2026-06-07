@@ -329,6 +329,18 @@ async function saveRecordChanges(record, changes) {
   }
 }
 
+function setDetailSaving(isSaving) {
+  const button = elements.detail.querySelector(".save-detail-changes");
+  const fields = elements.detail.querySelectorAll(".detail-edit-section input, .detail-edit-section select, .detail-edit-section textarea");
+  if (button) {
+    button.disabled = isSaving;
+    button.textContent = isSaving ? "Saving..." : "Save Changes";
+  }
+  fields.forEach((field) => {
+    field.disabled = isSaving;
+  });
+}
+
 function applySavedChanges(record, changes, result = {}) {
   if (changes["Dashboard Status"] !== undefined) {
     record.dashboardStatus = changes["Dashboard Status"];
@@ -470,6 +482,7 @@ function openDetail(record) {
       ${detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
+      ${detailRow("Status", STATUS_LABELS[record.status] || record.status)}
       ${detailRow("Priority", record.priority)}
       ${detailRow("Request number", record.requestNumber)}
       ${detailRow("ING", record.ing)}
@@ -493,7 +506,9 @@ function openDetail(record) {
     }
     const confirmed = window.confirm(`Confirm changes?\n\n${changesSummary(record, changes)}`);
     if (!confirmed) return;
+    setDetailSaving(true);
     await saveRecordChanges(record, changes);
+    setDetailSaving(false);
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
     elements.detail.classList.add("is-hidden");
