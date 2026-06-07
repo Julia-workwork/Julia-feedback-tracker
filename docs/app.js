@@ -262,6 +262,7 @@ function detailRow(label, value) {
 }
 
 function openDetail(record) {
+  document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
     <div class="detail-panel__header">
@@ -269,7 +270,10 @@ function openDetail(record) {
         <div class="card-meta">${categoryPillsTemplate(record)}</div>
         <h2>${escapeHtml(record.keyPoints || "Feedback detail")}</h2>
       </div>
-      <button type="button" id="close-detail">Close</button>
+      <div class="detail-actions">
+        <button class="copy-detail-summary" type="button">Copy Engineer Summary</button>
+        <button type="button" id="close-detail">Close</button>
+      </div>
     </div>
     <dl class="detail-list">
       ${detailRow("Model", record.model)}
@@ -287,10 +291,21 @@ function openDetail(record) {
       ${detailRow("Notes", record.notes)}
     </dl>
   `;
+  document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
+    await copyEngineerSummary(record);
+    showToast("Engineer summary copied");
+  });
   document.querySelector("#close-detail").addEventListener("click", () => {
     elements.detail.classList.add("is-hidden");
+    document.body.classList.remove("detail-open");
   });
 }
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || elements.detail.classList.contains("is-hidden")) return;
+  elements.detail.classList.add("is-hidden");
+  document.body.classList.remove("detail-open");
+});
 
 function render() {
   const filtered = filterFeedback(state.records, state.filters);

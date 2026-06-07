@@ -19,6 +19,10 @@ body {
   background: #f7f8fb;
 }
 
+body.detail-open {
+  overflow: hidden;
+}
+
 .is-hidden {
   display: none !important;
 }
@@ -553,7 +557,8 @@ body {
   z-index: 20;
   width: min(560px, 100vw);
   height: 100vh;
-  overflow: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-left: 1px solid #dce3ec;
   background: #ffffff;
   box-shadow: -12px 0 30px rgb(25 36 48 / 18%);
@@ -572,12 +577,28 @@ body {
   font-size: 20px;
 }
 
+.detail-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
 .detail-panel__header button {
   height: 36px;
   border: 1px solid #cad3df;
   border-radius: 6px;
   background: #ffffff;
   cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+.detail-panel__header .copy-detail-summary {
+  border-color: #050505;
+  background: #050505;
+  color: #ffffff;
 }
 
 .detail-list div {
