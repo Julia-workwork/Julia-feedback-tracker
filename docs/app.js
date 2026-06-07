@@ -361,8 +361,8 @@ function detailRow(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "-")}</dd></div>`;
 }
 
-function editableDetailRow(label, fieldHtml) {
-  return `<div class="detail-editable-row"><dt>${escapeHtml(label)}</dt><dd>${fieldHtml}</dd></div>`;
+function editableDetailRow(label, fieldHtml, size = "medium") {
+  return `<div class="detail-editable-row detail-editable-row--${size}"><dt>${escapeHtml(label)}</dt><dd>${fieldHtml}</dd></div>`;
 }
 
 function statusSelectTemplate(record) {
@@ -464,15 +464,15 @@ function openDetail(record) {
       ${detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
-      ${editableDetailRow("Status", statusSelectTemplate(record))}
-      ${editableDetailRow("Priority", prioritySelectTemplate(record))}
+      ${editableDetailRow("Status", statusSelectTemplate(record), "short")}
+      ${editableDetailRow("Priority", prioritySelectTemplate(record), "short")}
       ${editableDetailRow("Request number", `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
-      ${editableDetailRow("ING", `<input name="ING" value="${escapeHtml(record.ing)}" />`)}
-      ${editableDetailRow("DONE", doneSelectTemplate(record))}
+      ${editableDetailRow("ING", `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
+      ${editableDetailRow("DONE", doneSelectTemplate(record), "short")}
       ${modificationRowsTemplate(record)}
       ${detailRow("Upgrade requirements", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
-      ${editableDetailRow("Notes", `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`)}
+      ${editableDetailRow("Notes", `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
     </dl>
     <button class="save-detail-changes" type="button">Save Changes</button>
   `;

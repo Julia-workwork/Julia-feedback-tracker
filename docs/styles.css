@@ -592,6 +592,22 @@ body.detail-open {
   padding: 8px 11px;
 }
 
+.detail-editable-row--short dd {
+  max-width: 170px;
+}
+
+.detail-editable-row--medium dd {
+  max-width: 260px;
+}
+
+.detail-editable-row--wide {
+  grid-column: 1 / -1;
+}
+
+.detail-editable-row--wide dd {
+  max-width: none;
+}
+
 .detail-editable-row select {
   border-radius: 999px;
 }
