@@ -276,7 +276,7 @@ function recordMatchPayload(record) {
 function syncChangesToGoogleSheet(record, changes) {
   return new Promise((resolve, reject) => {
     if (!GOOGLE_APPS_SCRIPT_URL) {
-      reject(new Error("Google Apps Script URL is not configured yet."));
+      reject(new Error("Sync is not configured yet."));
       return;
     }
 
@@ -301,12 +301,12 @@ function syncChangesToGoogleSheet(record, changes) {
         resolve(payload);
         return;
       }
-      reject(new Error(payload?.message || "Google Sheet status update failed."));
+      reject(new Error(payload?.message || "Update failed."));
     };
 
     script.addEventListener("error", () => {
       cleanup();
-      reject(new Error("Unable to reach Google Apps Script."));
+      reject(new Error("Unable to save changes."));
     });
 
     document.head.append(script);
@@ -314,7 +314,7 @@ function syncChangesToGoogleSheet(record, changes) {
 }
 
 async function saveRecordChanges(record, changes) {
-  showToast("Updating Google Sheet...");
+  showToast("Saving changes...");
   try {
     const result = await syncChangesToGoogleSheet(record, changes);
     applySavedChanges(record, changes, result);
@@ -323,7 +323,7 @@ async function saveRecordChanges(record, changes) {
     renderBoard(applySummaryFilter(filtered));
     setMessage("");
     openDetail(record);
-    showToast("Google Sheet updated");
+    showToast("Changes saved");
   } catch (error) {
     showToast(error instanceof Error ? error.message : "Update failed");
   }
@@ -513,7 +513,7 @@ function render() {
   renderSummary(filtered);
   renderBoard(visibleRecords);
   if (!state.records.length) {
-    setMessage("Google Sheet loaded, but no feedback rows were found. Please check the sheet tab and headers.", true);
+    setMessage("Feedback data loaded, but no records were found.", true);
     return;
   }
   setMessage(visibleRecords.length ? "" : "No feedback matches the selected filters.");
@@ -582,7 +582,7 @@ function loadSheetRows() {
       script.remove();
 
       if (payload.status !== "ok") {
-        reject(new Error("Google Sheet is not publicly readable. Please share it as Anyone with the link can view."));
+        reject(new Error("Feedback data is not available right now."));
         return;
       }
 
@@ -592,7 +592,7 @@ function loadSheetRows() {
     script.addEventListener("error", () => {
       delete window[callbackName];
       script.remove();
-      reject(new Error("Unable to load Google Sheets data."));
+      reject(new Error("Unable to load feedback data."));
     });
 
     document.head.append(script);
@@ -600,7 +600,7 @@ function loadSheetRows() {
 }
 
 async function load() {
-  setMessage("Loading Google Sheets data...");
+  setMessage("Loading feedback data...");
   renderSummary([]);
   elements.board.innerHTML = "";
   try {
