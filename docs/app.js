@@ -9,7 +9,7 @@ import {
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const SHEET_GID = "1702171693";
-const EXPECTED_SHEET_HEADERS = new Set([
+const SHEET_HEADERS_BY_POSITION = [
   "Date",
   "Model",
   "ID",
@@ -25,6 +25,9 @@ const EXPECTED_SHEET_HEADERS = new Set([
   "Priority",
   "DONE",
   "Channel",
+];
+const EXPECTED_SHEET_HEADERS = new Set([
+  ...SHEET_HEADERS_BY_POSITION,
 ]);
 
 const state = {
@@ -338,6 +341,11 @@ function tableRowsToRecords(table) {
   const firstRowHasExpectedHeaders = firstRowHeaders.some((header) => EXPECTED_SHEET_HEADERS.has(header));
   if (firstRowHasExpectedHeaders) {
     return buildRecordsFromHeaders(table.rows.slice(1), firstRowHeaders);
+  }
+
+  const idsLookLikeColumnLetters = ids.every((id) => /^[A-Z]+$/.test(id));
+  if (idsLookLikeColumnLetters) {
+    return buildRecordsFromHeaders(table.rows, SHEET_HEADERS_BY_POSITION);
   }
 
   return parsedRecords;
