@@ -577,42 +577,9 @@ body.detail-open {
   font-size: 20px;
 }
 
-.detail-edit-section {
-  margin-top: 22px;
-  border-top: 1px solid #dce3ec;
-  padding-top: 18px;
-}
-
-.detail-edit-section h3 {
-  margin: 0 0 14px;
-  color: #11161d;
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.detail-edit-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 13px;
-}
-
-.detail-field {
-  display: grid;
-  gap: 7px;
-  color: #687382;
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.detail-field--wide {
-  grid-column: 1 / -1;
-}
-
-.detail-field input,
-.detail-field select,
-.detail-field textarea {
+.detail-editable-row input,
+.detail-editable-row select,
+.detail-editable-row textarea {
   width: 100%;
   min-height: 38px;
   border: 1px solid #cad3df;
@@ -625,25 +592,25 @@ body.detail-open {
   padding: 8px 11px;
 }
 
-.detail-field select {
+.detail-editable-row select {
   border-radius: 999px;
 }
 
-.detail-field textarea {
+.detail-editable-row textarea {
   resize: vertical;
   line-height: 1.45;
 }
 
-.detail-field input:disabled,
-.detail-field select:disabled,
-.detail-field textarea:disabled {
+.detail-editable-row input:disabled,
+.detail-editable-row select:disabled,
+.detail-editable-row textarea:disabled {
   opacity: 0.55;
 }
 
 .save-detail-changes {
   width: 100%;
   min-height: 42px;
-  margin-top: 14px;
+  margin-top: 16px;
   border: 1px solid #0874f2;
   border-radius: 999px;
   background: #0874f2;

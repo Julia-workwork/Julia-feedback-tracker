@@ -332,7 +332,7 @@ async function saveRecordChanges(record, changes) {
 
 function setDetailSaving(isSaving) {
   const button = elements.detail.querySelector(".save-detail-changes");
-  const fields = elements.detail.querySelectorAll(".detail-edit-section input, .detail-edit-section select, .detail-edit-section textarea");
+  const fields = elements.detail.querySelectorAll(".detail-editable-row input, .detail-editable-row select, .detail-editable-row textarea");
   if (button) {
     button.disabled = isSaving;
     button.textContent = isSaving ? "Saving..." : "Save Changes";
@@ -361,59 +361,40 @@ function detailRow(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "-")}</dd></div>`;
 }
 
+function editableDetailRow(label, fieldHtml) {
+  return `<div class="detail-editable-row"><dt>${escapeHtml(label)}</dt><dd>${fieldHtml}</dd></div>`;
+}
+
 function statusSelectTemplate(record) {
   return `
-    <label class="detail-field">
-      Status
-      <select name="Dashboard Status">
-        ${Object.entries(STATUS_LABELS)
-          .map(
-            ([status, label]) =>
-              `<option value="${escapeHtml(label)}"${record.status === status ? " selected" : ""}>${escapeHtml(label)}</option>`,
-          )
-          .join("")}
-      </select>
-    </label>
+    <select name="Dashboard Status">
+      ${Object.entries(STATUS_LABELS)
+        .map(
+          ([status, label]) =>
+            `<option value="${escapeHtml(label)}"${record.status === status ? " selected" : ""}>${escapeHtml(label)}</option>`,
+        )
+        .join("")}
+    </select>
   `;
 }
 
-function editableFieldsTemplate(record) {
+function prioritySelectTemplate(record) {
   return `
-    <section class="detail-edit-section" aria-label="Editable follow-up fields">
-      <h3>Editable Follow-up</h3>
-      <div class="detail-edit-grid">
-        ${statusSelectTemplate(record)}
-        <label class="detail-field">
-          Priority
-          <select name="Priority">
-            ${["", "P0", "P1", "P2"]
-              .map((priority) => `<option value="${priority}"${record.priority === priority ? " selected" : ""}>${priority || "-"}</option>`)
-              .join("")}
-          </select>
-        </label>
-        <label class="detail-field">
-          Request number
-          <input name="Request number" value="${escapeHtml(record.requestNumber)}" />
-        </label>
-        <label class="detail-field">
-          ING
-          <input name="ING" value="${escapeHtml(record.ing)}" />
-        </label>
-        <label class="detail-field">
-          DONE
-          <select name="DONE">
-            ${["", "No", "Yes"]
-              .map((done) => `<option value="${done}"${record.done === done ? " selected" : ""}>${done || "-"}</option>`)
-              .join("")}
-          </select>
-        </label>
-        <label class="detail-field detail-field--wide">
-          Notes
-          <textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>
-        </label>
-      </div>
-      <button class="save-detail-changes" type="button">Save Changes</button>
-    </section>
+    <select name="Priority">
+      ${["", "P0", "P1", "P2"]
+        .map((priority) => `<option value="${priority}"${record.priority === priority ? " selected" : ""}>${priority || "-"}</option>`)
+        .join("")}
+    </select>
+  `;
+}
+
+function doneSelectTemplate(record) {
+  return `
+    <select name="DONE">
+      ${["", "No", "Yes"]
+        .map((done) => `<option value="${done}"${record.done === done ? " selected" : ""}>${done || "-"}</option>`)
+        .join("")}
+    </select>
   `;
 }
 
@@ -483,17 +464,17 @@ function openDetail(record) {
       ${detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
-      ${detailRow("Status", STATUS_LABELS[record.status] || record.status)}
-      ${detailRow("Priority", record.priority)}
-      ${detailRow("Request number", record.requestNumber)}
-      ${detailRow("ING", record.ing)}
-      ${detailRow("DONE", record.done)}
+      ${editableDetailRow("Status", statusSelectTemplate(record))}
+      ${editableDetailRow("Priority", prioritySelectTemplate(record))}
+      ${editableDetailRow("Request number", `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
+      ${editableDetailRow("ING", `<input name="ING" value="${escapeHtml(record.ing)}" />`)}
+      ${editableDetailRow("DONE", doneSelectTemplate(record))}
       ${modificationRowsTemplate(record)}
       ${detailRow("Upgrade requirements", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
-      ${detailRow("Notes", record.notes)}
+      ${editableDetailRow("Notes", `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`)}
     </dl>
-    ${editableFieldsTemplate(record)}
+    <button class="save-detail-changes" type="button">Save Changes</button>
   `;
   document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
     await copyEngineerSummary(record);
