@@ -284,6 +284,7 @@ function syncChangesToGoogleSheet(record, changes) {
     const script = document.createElement("script");
     const query = new URLSearchParams({
       callback: callbackName,
+      status: changes["Dashboard Status"] || "",
       changes: JSON.stringify(changes),
       match: JSON.stringify(recordMatchPayload(record)),
     });
