@@ -43,8 +43,6 @@ const state = {
     dateFrom: "",
     dateTo: "",
   },
-  draggedRecordIndex: null,
-  isDragging: false,
 };
 
 const elements = {
@@ -147,7 +145,6 @@ function cardTemplate(record, index) {
     <article
       class="feedback-card"
       data-index="${index}"
-      draggable="true"
       role="button"
       tabindex="0"
       aria-label="Open feedback details"
@@ -192,25 +189,7 @@ function renderBoard(records) {
     .join("");
 
   elements.board.querySelectorAll(".feedback-card").forEach((button) => {
-    button.addEventListener("dragstart", (event) => {
-      state.draggedRecordIndex = Number(button.dataset.index);
-      state.isDragging = true;
-      button.classList.add("is-dragging");
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", button.dataset.index);
-    });
-    button.addEventListener("dragend", () => {
-      state.draggedRecordIndex = null;
-      window.setTimeout(() => {
-        state.isDragging = false;
-      }, 0);
-      button.classList.remove("is-dragging");
-      elements.board.querySelectorAll(".status-column").forEach((column) => {
-        column.classList.remove("is-drop-target");
-      });
-    });
     button.addEventListener("click", (event) => {
-      if (state.isDragging) return;
       if (event.target.closest(".copy-summary")) return;
       const record = records[Number(button.dataset.index)];
       openDetail(record);
@@ -230,26 +209,6 @@ function renderBoard(records) {
       const record = records[Number(button.dataset.index)];
       await copyEngineerSummary(record);
       showToast("Engineer summary copied");
-    });
-  });
-
-  elements.board.querySelectorAll(".status-column").forEach((column) => {
-    column.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      column.classList.add("is-drop-target");
-      event.dataTransfer.dropEffect = "move";
-    });
-    column.addEventListener("dragleave", () => {
-      column.classList.remove("is-drop-target");
-    });
-    column.addEventListener("drop", async (event) => {
-      event.preventDefault();
-      column.classList.remove("is-drop-target");
-      const recordIndex = Number(event.dataTransfer.getData("text/plain") || state.draggedRecordIndex);
-      const record = records[recordIndex];
-      const nextStatus = column.dataset.status;
-      if (!record || !nextStatus || record.status === nextStatus) return;
-      await updateRecordStatus(record, nextStatus);
     });
   });
 }
@@ -351,13 +310,20 @@ function syncStatusToGoogleSheet(record, nextStatus) {
   });
 }
 
-async function updateRecordStatus(record, nextStatus) {
+async function updateRecordStatus(record, nextStatus, options = {}) {
   showToast("Updating Google Sheet...");
   try {
     await syncStatusToGoogleSheet(record, nextStatus);
     record.status = nextStatus;
     record.dashboardStatus = STATUS_LABELS[nextStatus];
-    render();
+    if (options.keepDetailOpen) {
+      const filtered = filterFeedback(state.records, state.filters);
+      renderSummary(filtered);
+      renderBoard(applySummaryFilter(filtered));
+      setMessage("");
+    } else {
+      render();
+    }
     showToast("Google Sheet status updated");
   } catch (error) {
     showToast(error instanceof Error ? error.message : "Status update failed");
@@ -368,6 +334,22 @@ function detailRow(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "-")}</dd></div>`;
 }
 
+function statusSelectTemplate(record) {
+  return `
+    <label class="detail-status-control">
+      Status
+      <select id="detail-status-select">
+        ${Object.entries(STATUS_LABELS)
+          .map(
+            ([status, label]) =>
+              `<option value="${status}"${record.status === status ? " selected" : ""}>${escapeHtml(label)}</option>`,
+          )
+          .join("")}
+      </select>
+    </label>
+  `;
+}
+
 function openDetail(record) {
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
@@ -376,6 +358,7 @@ function openDetail(record) {
       <div>
         <div class="card-meta">${categoryPillsTemplate(record)}</div>
         <h2>${escapeHtml(record.keyPoints || "Feedback detail")}</h2>
+        ${statusSelectTemplate(record)}
       </div>
       <div class="detail-actions">
         <button class="copy-detail-summary" type="button">Copy Engineer Summary</button>
@@ -401,6 +384,13 @@ function openDetail(record) {
   document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
     await copyEngineerSummary(record);
     showToast("Engineer summary copied");
+  });
+  document.querySelector("#detail-status-select").addEventListener("change", async (event) => {
+    const nextStatus = event.target.value;
+    if (!nextStatus || record.status === nextStatus) return;
+    event.target.disabled = true;
+    await updateRecordStatus(record, nextStatus, { keepDetailOpen: true });
+    event.target.disabled = false;
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
     elements.detail.classList.add("is-hidden");

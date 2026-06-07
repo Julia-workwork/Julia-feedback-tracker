@@ -577,6 +577,32 @@ body.detail-open {
   font-size: 20px;
 }
 
+.detail-status-control {
+  display: grid;
+  gap: 7px;
+  width: min(260px, 100%);
+  margin-top: 14px;
+  color: #687382;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.detail-status-control select {
+  min-height: 38px;
+  border: 1px solid #cad3df;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #11161d;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 13px;
+}
+
+.detail-status-control select:disabled {
+  opacity: 0.55;
+}
+
 .detail-actions {
   display: flex;
   flex-shrink: 0;
