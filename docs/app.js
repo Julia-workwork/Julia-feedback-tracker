@@ -9,6 +9,7 @@ import {
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const SHEET_GID = "1702171693";
+const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGan0BA3Zsl_EXw0gYkAYrgapvvt1k0oTQZB5uGXi8LqhQsp3KyfqrJv0qyGysL5UN/exec";
 const SHEET_HEADERS_BY_POSITION = [
   "Date",
   "Model",
@@ -25,6 +26,7 @@ const SHEET_HEADERS_BY_POSITION = [
   "Priority",
   "DONE",
   "Channel",
+  "Dashboard Status",
 ];
 const EXPECTED_SHEET_HEADERS = new Set([
   ...SHEET_HEADERS_BY_POSITION,
@@ -41,6 +43,8 @@ const state = {
     dateFrom: "",
     dateTo: "",
   },
+  draggedRecordIndex: null,
+  isDragging: false,
 };
 
 const elements = {
@@ -143,6 +147,7 @@ function cardTemplate(record, index) {
     <article
       class="feedback-card"
       data-index="${index}"
+      draggable="true"
       role="button"
       tabindex="0"
       aria-label="Open feedback details"
@@ -187,7 +192,25 @@ function renderBoard(records) {
     .join("");
 
   elements.board.querySelectorAll(".feedback-card").forEach((button) => {
+    button.addEventListener("dragstart", (event) => {
+      state.draggedRecordIndex = Number(button.dataset.index);
+      state.isDragging = true;
+      button.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", button.dataset.index);
+    });
+    button.addEventListener("dragend", () => {
+      state.draggedRecordIndex = null;
+      window.setTimeout(() => {
+        state.isDragging = false;
+      }, 0);
+      button.classList.remove("is-dragging");
+      elements.board.querySelectorAll(".status-column").forEach((column) => {
+        column.classList.remove("is-drop-target");
+      });
+    });
     button.addEventListener("click", (event) => {
+      if (state.isDragging) return;
       if (event.target.closest(".copy-summary")) return;
       const record = records[Number(button.dataset.index)];
       openDetail(record);
@@ -207,6 +230,26 @@ function renderBoard(records) {
       const record = records[Number(button.dataset.index)];
       await copyEngineerSummary(record);
       showToast("Engineer summary copied");
+    });
+  });
+
+  elements.board.querySelectorAll(".status-column").forEach((column) => {
+    column.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      column.classList.add("is-drop-target");
+      event.dataTransfer.dropEffect = "move";
+    });
+    column.addEventListener("dragleave", () => {
+      column.classList.remove("is-drop-target");
+    });
+    column.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      column.classList.remove("is-drop-target");
+      const recordIndex = Number(event.dataTransfer.getData("text/plain") || state.draggedRecordIndex);
+      const record = records[recordIndex];
+      const nextStatus = column.dataset.status;
+      if (!record || !nextStatus || record.status === nextStatus) return;
+      await updateRecordStatus(record, nextStatus);
     });
   });
 }
@@ -255,6 +298,70 @@ function showToast(text) {
   toast.textContent = text;
   document.body.append(toast);
   window.setTimeout(() => toast.remove(), 1800);
+}
+
+function recordMatchPayload(record) {
+  return {
+    date: record.date,
+    model: record.model,
+    id: record.id,
+    keyPoints: record.keyPoints,
+    upgradeRequirements: record.upgradeRequirements,
+    requestNumber: record.requestNumber,
+  };
+}
+
+function syncStatusToGoogleSheet(record, nextStatus) {
+  return new Promise((resolve, reject) => {
+    if (!GOOGLE_APPS_SCRIPT_URL) {
+      reject(new Error("Google Apps Script URL is not configured yet."));
+      return;
+    }
+
+    const callbackName = `handleStatusSync_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const query = new URLSearchParams({
+      callback: callbackName,
+      status: STATUS_LABELS[nextStatus],
+      match: JSON.stringify(recordMatchPayload(record)),
+    });
+    const separator = GOOGLE_APPS_SCRIPT_URL.includes("?") ? "&" : "?";
+    script.src = `${GOOGLE_APPS_SCRIPT_URL}${separator}${query.toString()}`;
+
+    const cleanup = () => {
+      delete window[callbackName];
+      script.remove();
+    };
+
+    window[callbackName] = (payload) => {
+      cleanup();
+      if (payload?.ok) {
+        resolve(payload);
+        return;
+      }
+      reject(new Error(payload?.message || "Google Sheet status update failed."));
+    };
+
+    script.addEventListener("error", () => {
+      cleanup();
+      reject(new Error("Unable to reach Google Apps Script."));
+    });
+
+    document.head.append(script);
+  });
+}
+
+async function updateRecordStatus(record, nextStatus) {
+  showToast("Updating Google Sheet...");
+  try {
+    await syncStatusToGoogleSheet(record, nextStatus);
+    record.status = nextStatus;
+    record.dashboardStatus = STATUS_LABELS[nextStatus];
+    render();
+    showToast("Google Sheet status updated");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "Status update failed");
+  }
 }
 
 function detailRow(label, value) {
