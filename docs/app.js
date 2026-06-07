@@ -12,6 +12,7 @@ const SHEET_GID = "1702171693";
 
 const state = {
   records: [],
+  summaryFilter: "",
   filters: {
     model: "all",
     search: "",
@@ -64,19 +65,47 @@ function renderModelOptions() {
 function renderSummary(records) {
   const summary = summarizeFeedback(records);
   const items = [
-    ["Total", summary.total, "summary-total"],
-    ["To Submit", summary.statusCounts.todo, "summary-todo"],
-    ["Submitted", summary.statusCounts.submitted, "summary-submitted"],
-    ["In Progress", summary.statusCounts.inProgress, "summary-progress"],
-    ["Resolved", summary.statusCounts.resolved, "summary-resolved"],
-    ["Unresolved BUG", summary.unresolvedBugs, "summary-bug"],
+    ["total", "Total", summary.total, "summary-total"],
+    ["todo", "To Submit", summary.statusCounts.todo, "summary-todo"],
+    ["submitted", "Submitted", summary.statusCounts.submitted, "summary-submitted"],
+    ["inProgress", "In Progress", summary.statusCounts.inProgress, "summary-progress"],
+    ["resolved", "Resolved", summary.statusCounts.resolved, "summary-resolved"],
+    ["unresolvedBug", "Unresolved BUG", summary.unresolvedBugs, "summary-bug"],
   ];
   elements.summary.innerHTML = items
     .map(
-      ([label, value, className]) =>
-        `<div class="${className}"><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`,
+      ([key, label, value, className]) => `
+        <button
+          class="${className}${state.summaryFilter === key ? " is-active" : ""}"
+          type="button"
+          data-summary-filter="${key}"
+          aria-pressed="${state.summaryFilter === key ? "true" : "false"}"
+        >
+          <span>${escapeHtml(label)}</span>
+          <strong>${value}</strong>
+        </button>
+      `,
     )
     .join("");
+}
+
+function applySummaryFilter(records) {
+  if (state.summaryFilter === "todo") {
+    return records.filter((record) => record.status === "todo");
+  }
+  if (state.summaryFilter === "submitted") {
+    return records.filter((record) => record.status === "submitted");
+  }
+  if (state.summaryFilter === "inProgress") {
+    return records.filter((record) => record.status === "inProgress");
+  }
+  if (state.summaryFilter === "resolved") {
+    return records.filter((record) => record.status === "resolved");
+  }
+  if (state.summaryFilter === "unresolvedBug") {
+    return records.filter((record) => record.status !== "resolved" && record.categories.includes("BUG"));
+  }
+  return records;
 }
 
 function categoryPillsTemplate(record) {
@@ -91,7 +120,13 @@ function categoryPillsTemplate(record) {
 
 function cardTemplate(record, index) {
   return `
-    <button class="feedback-card" type="button" data-index="${index}">
+    <article
+      class="feedback-card"
+      data-index="${index}"
+      role="button"
+      tabindex="0"
+      aria-label="Open feedback details"
+    >
       <div class="card-meta">
         ${categoryPillsTemplate(record)}
         ${record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : ""}
@@ -103,7 +138,11 @@ function cardTemplate(record, index) {
         <div><dt>Done</dt><dd>${escapeHtml(record.done || "-")}</dd></div>
         <div><dt>Channel</dt><dd>${escapeHtml(record.channel || "-")}</dd></div>
       </dl>
-    </button>
+      <div class="card-actions">
+        <button class="copy-summary" type="button" data-index="${index}">Copy Summary</button>
+        <span aria-hidden="true">View</span>
+      </div>
+    </article>
   `;
 }
 
@@ -128,11 +167,74 @@ function renderBoard(records) {
     .join("");
 
   elements.board.querySelectorAll(".feedback-card").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      if (event.target.closest(".copy-summary")) return;
+      const record = records[Number(button.dataset.index)];
+      openDetail(record);
+    });
+    button.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      if (event.target.closest(".copy-summary")) return;
+      event.preventDefault();
       const record = records[Number(button.dataset.index)];
       openDetail(record);
     });
   });
+
+  elements.board.querySelectorAll(".copy-summary").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const record = records[Number(button.dataset.index)];
+      await copyEngineerSummary(record);
+      showToast("Engineer summary copied");
+    });
+  });
+}
+
+function engineerSummary(record) {
+  return [
+    `Model: ${record.model || "-"}`,
+    `Category: ${record.updateCategory || "-"}`,
+    `Priority: ${record.priority || "-"}`,
+    `Status: ${STATUS_LABELS[record.status] || record.status || "-"}`,
+    `Date: ${record.date || "-"}`,
+    `Request number: ${record.requestNumber || "-"}`,
+    `Key Points: ${record.keyPoints || "-"}`,
+    `Upgrade requirements: ${record.upgradeRequirements || "-"}`,
+    `Chinese: ${record.chinese || "-"}`,
+    `Notes: ${record.notes || "-"}`,
+    `Channel: ${record.channel || "-"}`,
+    `User ID: ${record.id || "-"}`,
+  ].join("\n");
+}
+
+async function copyEngineerSummary(record) {
+  const text = engineerSummary(record);
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
+
+function showToast(text) {
+  const existing = document.querySelector(".copy-toast");
+  existing?.remove();
+
+  const toast = document.createElement("div");
+  toast.className = "copy-toast";
+  toast.textContent = text;
+  document.body.append(toast);
+  window.setTimeout(() => toast.remove(), 1800);
 }
 
 function detailRow(label, value) {
@@ -172,9 +274,10 @@ function openDetail(record) {
 
 function render() {
   const filtered = filterFeedback(state.records, state.filters);
+  const visibleRecords = applySummaryFilter(filtered);
   renderSummary(filtered);
-  renderBoard(filtered);
-  setMessage(filtered.length ? "" : "No feedback matches the selected filters.");
+  renderBoard(visibleRecords);
+  setMessage(visibleRecords.length ? "" : "No feedback matches the selected filters.");
 }
 
 function loadSheetRows() {
@@ -257,5 +360,13 @@ elements.dateTo.addEventListener("change", () => {
   render();
 });
 elements.refresh.addEventListener("click", load);
+elements.summary.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-summary-filter]");
+  if (!button) return;
+
+  const nextFilter = button.dataset.summaryFilter;
+  state.summaryFilter = nextFilter === "total" || state.summaryFilter === nextFilter ? "" : nextFilter;
+  render();
+});
 
 load();
