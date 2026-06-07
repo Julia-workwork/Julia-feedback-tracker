@@ -368,7 +368,7 @@ function statusSelectTemplate(record) {
         ${Object.entries(STATUS_LABELS)
           .map(
             ([status, label]) =>
-              `<option value="${status}"${record.status === status ? " selected" : ""}>${escapeHtml(label)}</option>`,
+              `<option value="${escapeHtml(label)}"${record.status === status ? " selected" : ""}>${escapeHtml(label)}</option>`,
           )
           .join("")}
       </select>
