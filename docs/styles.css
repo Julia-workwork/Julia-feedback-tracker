@@ -619,9 +619,10 @@ body.detail-open {
 
 .detail-editable-row--wide textarea {
   min-height: 96px;
-  border-color: transparent;
-  background: #f7f8fb;
-  box-shadow: inset 0 0 0 1px transparent;
+  border-color: #e2d8b8;
+  border-left: 5px solid #e7bd3d;
+  background: #fffaf0;
+  box-shadow: 0 10px 26px rgb(120 93 24 / 7%);
   color: #24313d;
   font-weight: 650;
   transition:
@@ -631,11 +632,13 @@ body.detail-open {
 }
 
 .detail-editable-row--wide textarea:hover {
-  background: #f3f6fa;
+  background: #fff7e3;
+  box-shadow: 0 14px 32px rgb(120 93 24 / 10%);
 }
 
 .detail-editable-row--wide textarea:focus {
   border-color: #0874f2;
+  border-left-color: #0874f2;
   background: #ffffff;
   box-shadow: 0 0 0 3px rgb(8 116 242 / 12%);
   outline: 0;
