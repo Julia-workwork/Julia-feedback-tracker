@@ -273,7 +273,7 @@ function recordMatchPayload(record) {
   };
 }
 
-function syncChangesToGoogleSheet(record, changes) {
+function syncChangesToGoogleSheet(record, changes, editorCode) {
   return new Promise((resolve, reject) => {
     if (!GOOGLE_APPS_SCRIPT_URL) {
       reject(new Error("Sync is not configured yet."));
@@ -286,6 +286,7 @@ function syncChangesToGoogleSheet(record, changes) {
       callback: callbackName,
       status: changes["Dashboard Status"] || "",
       changes: JSON.stringify(changes),
+      editorCode,
       match: JSON.stringify(recordMatchPayload(record)),
     });
     const separator = GOOGLE_APPS_SCRIPT_URL.includes("?") ? "&" : "?";
@@ -314,10 +315,10 @@ function syncChangesToGoogleSheet(record, changes) {
   });
 }
 
-async function saveRecordChanges(record, changes) {
+async function saveRecordChanges(record, changes, editorCode) {
   showToast("Saving changes...");
   try {
-    const result = await syncChangesToGoogleSheet(record, changes);
+    const result = await syncChangesToGoogleSheet(record, changes, editorCode);
     applySavedChanges(record, changes, result);
     const filtered = filterFeedback(state.records, state.filters);
     renderSummary(filtered);
@@ -488,8 +489,13 @@ function openDetail(record) {
     }
     const confirmed = window.confirm(`Confirm changes?\n\n${changesSummary(record, changes)}`);
     if (!confirmed) return;
+    const editorCode = window.prompt("Enter editor code to save changes:");
+    if (!editorCode) {
+      showToast("Edit cancelled");
+      return;
+    }
     setDetailSaving(true);
-    await saveRecordChanges(record, changes);
+    await saveRecordChanges(record, changes, editorCode);
     setDetailSaving(false);
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
