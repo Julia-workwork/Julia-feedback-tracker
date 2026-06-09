@@ -273,21 +273,18 @@ function recordMatchPayload(record) {
   };
 }
 
-function syncChangesToGoogleSheet(record, changes, editorCode) {
+function callGoogleAppsScript(params) {
   return new Promise((resolve, reject) => {
     if (!GOOGLE_APPS_SCRIPT_URL) {
       reject(new Error("Sync is not configured yet."));
       return;
     }
 
-    const callbackName = `handleStatusSync_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const callbackName = `handleSheetSync_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
     const query = new URLSearchParams({
       callback: callbackName,
-      status: changes["Dashboard Status"] || "",
-      changes: JSON.stringify(changes),
-      editorCode: String(editorCode || "").trim(),
-      match: JSON.stringify(recordMatchPayload(record)),
+      ...params,
     });
     const separator = GOOGLE_APPS_SCRIPT_URL.includes("?") ? "&" : "?";
     script.src = `${GOOGLE_APPS_SCRIPT_URL}${separator}${query.toString()}`;
@@ -299,20 +296,38 @@ function syncChangesToGoogleSheet(record, changes, editorCode) {
 
     window[callbackName] = (payload) => {
       cleanup();
-      if (payload?.ok) {
-        resolve(payload);
-        return;
-      }
-      reject(new Error(payload?.message || "Update failed."));
+      resolve(payload);
     };
 
     script.addEventListener("error", () => {
       cleanup();
-      reject(new Error("Unable to save changes."));
+      reject(new Error("Unable to contact the edit service."));
     });
 
     document.head.append(script);
   });
+}
+
+async function verifyEditorCode(editorCode) {
+  const payload = await callGoogleAppsScript({
+    action: "ping",
+    editorCode: String(editorCode || "").trim(),
+  });
+  if (!payload?.ok || !payload?.canEdit) {
+    throw new Error("Edit code was rejected by this dashboard endpoint.");
+  }
+}
+
+function syncChangesToGoogleSheet(record, changes, editorCode) {
+  return callGoogleAppsScript({
+      status: changes["Dashboard Status"] || "",
+      changes: JSON.stringify(changes),
+      editorCode: String(editorCode || "").trim(),
+      match: JSON.stringify(recordMatchPayload(record)),
+    }).then((payload) => {
+      if (payload?.ok) return payload;
+      throw new Error(payload?.message || "Update failed.");
+    });
 }
 
 async function saveRecordChanges(record, changes, editorCode) {
@@ -496,7 +511,12 @@ function openDetail(record) {
       return;
     }
     setDetailSaving(true);
-    await saveRecordChanges(record, changes, cleanEditorCode);
+    try {
+      await verifyEditorCode(cleanEditorCode);
+      await saveRecordChanges(record, changes, cleanEditorCode);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Update failed");
+    }
     setDetailSaving(false);
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
