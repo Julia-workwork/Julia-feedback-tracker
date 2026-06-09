@@ -286,7 +286,7 @@ function syncChangesToGoogleSheet(record, changes, editorCode) {
       callback: callbackName,
       status: changes["Dashboard Status"] || "",
       changes: JSON.stringify(changes),
-      editorCode,
+      editorCode: String(editorCode || "").trim(),
       match: JSON.stringify(recordMatchPayload(record)),
     });
     const separator = GOOGLE_APPS_SCRIPT_URL.includes("?") ? "&" : "?";
@@ -490,12 +490,13 @@ function openDetail(record) {
     const confirmed = window.confirm(`Confirm changes?\n\n${changesSummary(record, changes)}`);
     if (!confirmed) return;
     const editorCode = window.prompt("Enter editor code to save changes:");
-    if (!editorCode) {
+    const cleanEditorCode = String(editorCode || "").trim();
+    if (!cleanEditorCode) {
       showToast("Edit cancelled");
       return;
     }
     setDetailSaving(true);
-    await saveRecordChanges(record, changes, editorCode);
+    await saveRecordChanges(record, changes, cleanEditorCode);
     setDetailSaving(false);
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
