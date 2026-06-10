@@ -845,7 +845,9 @@ body.detail-open {
 }
 
 .firmware-details {
-  display: contents;
+  grid-column: 1 / -1;
+  margin-top: 0;
+  text-align: right;
 }
 
 .firmware-details summary {
@@ -869,7 +871,7 @@ body.detail-open {
 }
 
 .firmware-log-grid {
-  grid-column: 1 / -1;
+  text-align: left;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
@@ -881,6 +883,7 @@ body.detail-open {
   border-radius: 14px;
   background: #ffffff;
   padding: 14px;
+  min-width: 0;
 }
 
 .firmware-log-grid h3,
@@ -894,11 +897,13 @@ body.detail-open {
 
 .firmware-log-grid p {
   margin: 0;
+  line-height: 1.5;
   white-space: pre-line;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .closed-requests {
-  grid-column: 1 / -1;
   margin-top: 20px;
 }
 
