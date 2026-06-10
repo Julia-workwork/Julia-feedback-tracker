@@ -806,6 +806,30 @@ body.detail-open {
   white-space: nowrap;
 }
 
+.firmware-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.firmware-meta span {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #dce3ed;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #4b5868;
+  font-size: 0.86rem;
+  font-weight: 750;
+  padding: 8px 12px;
+}
+
+.firmware-meta strong {
+  color: #101820;
+}
+
 .firmware-log-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

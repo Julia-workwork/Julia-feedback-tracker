@@ -4,6 +4,7 @@ import {
   categoryClass,
   filterFeedback,
   filterFirmware,
+  isFirmwareReleaseLikeFeedbackRow,
   normalizeFirmwareRow,
   normalizeRequestNumber,
   normalizeRow,
@@ -39,7 +40,7 @@ const SHEET_HEADERS_BY_POSITION = [
   "Last Modified By",
   "Status Change Log",
 ];
-const FIRMWARE_REQUIRED_HEADERS = ["Date", "Model", "Verion", "Change log", "更新日志", "关闭需求"];
+const FIRMWARE_REQUIRED_HEADERS = ["Date", "Model", "Firmware Version", "Change log", "更新日志", "关闭需求"];
 const EXPECTED_SHEET_HEADERS = new Set([
   ...SHEET_HEADERS_BY_POSITION,
   ...FIRMWARE_REQUIRED_HEADERS,
@@ -240,6 +241,11 @@ function firmwareCardTemplate(release) {
   const closedRequests = release.closedRequests.length
     ? release.closedRequests.map((request) => `<span>${escapeHtml(request)}</span>`).join("")
     : `<span>-</span>`;
+  const metadata = [
+    ["Hardware", release.hardwareVersion],
+    ["Status", release.versionStatus],
+    ["Reason", release.reasonForChange],
+  ].filter(([, value]) => value);
   return `
     <article class="firmware-card">
       <header>
@@ -249,6 +255,17 @@ function firmwareCardTemplate(release) {
         </div>
         <time>${escapeHtml(release.date || "-")}</time>
       </header>
+      ${
+        metadata.length
+          ? `<div class="firmware-meta">${metadata
+              .map(
+                ([label, value]) => `
+                  <span><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</span>
+                `,
+              )
+              .join("")}</div>`
+          : ""
+      }
       <div class="firmware-log-grid">
         <section>
           <h3>Change Log</h3>
@@ -805,7 +822,7 @@ async function load() {
       throw feedbackRows.reason;
     }
 
-    state.records = feedbackRows.value.map(normalizeRow);
+    state.records = feedbackRows.value.filter((row) => !isFirmwareReleaseLikeFeedbackRow(row)).map(normalizeRow);
     renderModelOptions();
 
     if (firmwareResult.status === "fulfilled") {

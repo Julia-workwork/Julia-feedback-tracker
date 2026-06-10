@@ -106,12 +106,40 @@ export function normalizeFirmwareRow(row) {
   return {
     date: clean(row.Date),
     model: clean(row.Model),
-    version: clean(row.Verion || row.Version),
+    hardwareVersion: clean(row["Hardware version"]),
+    version: clean(row["Firmware Version"] || row.Verion || row.Version),
+    versionStatus: clean(row["版本状态"]),
+    reasonForChange: clean(row["Reason for Change"]),
     changeLog: clean(row["Change log"]),
     chineseLog: clean(row["更新日志"]),
     closedRequestsRaw: clean(row["关闭需求"]),
     closedRequests: parseClosedRequests(row["关闭需求"]),
   };
+}
+
+export function isFirmwareReleaseLikeFeedbackRow(row) {
+  const updateCategory = clean(row["Update Category"]);
+  const id = clean(row.ID);
+  const requestNumber = clean(row["Request number"]);
+  const channel = clean(row.Channel);
+  const model = clean(row.Model);
+  const keyPoints = clean(row["Key Points"]);
+  const upgradeRequirements = clean(row["Upgrade requirements"]);
+  const chinese = clean(row.Chinese);
+
+  const versionPattern = /\bv?\d+\.\d+(?:\.\d+){1,}\b/i;
+  const numberedListPattern = /(^|\n)\s*\d+[.)、]/;
+  const firmwareWordPattern = /\b(firmware|version|fixed|added|optimized|modified)\b/i;
+  const chineseFirmwarePattern = /(固件|版本|修复|新增|优化|修改|解决)/;
+
+  const hasVersionSignal = versionPattern.test(model) || versionPattern.test(keyPoints);
+  const hasChangelogSignal =
+    numberedListPattern.test(upgradeRequirements) ||
+    numberedListPattern.test(chinese) ||
+    firmwareWordPattern.test(upgradeRequirements) ||
+    chineseFirmwarePattern.test(chinese);
+
+  return !updateCategory && !id && !requestNumber && !channel && hasVersionSignal && hasChangelogSignal;
 }
 
 export function buildFirmwareLookup(releases) {
@@ -220,7 +248,10 @@ export function filterFirmware(releases, filters) {
     const dateToMatch = !dateTo || (releaseDate && releaseDate <= dateTo);
     const haystack = [
       release.model,
+      release.hardwareVersion,
       release.version,
+      release.versionStatus,
+      release.reasonForChange,
       release.changeLog,
       release.chineseLog,
       release.closedRequestsRaw,
