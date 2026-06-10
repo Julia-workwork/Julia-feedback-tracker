@@ -749,6 +749,7 @@ function openDetail(record) {
       </div>
     </div>
     <dl class="detail-list">
+      ${linkedFirmwareTemplate(record)}
       ${detailRow("Model", record.model)}
       ${detailRow("User ID", record.id)}
       ${detailRow("Email", record.email)}
@@ -763,7 +764,6 @@ function openDetail(record) {
       ${modificationRowsTemplate(record)}
       ${detailRow("Upgrade requirements", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
-      ${linkedFirmwareTemplate(record)}
       ${editableDetailRow("Notes", `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
     </dl>
     <button class="save-detail-changes" type="button">Save Changes</button>

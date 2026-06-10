@@ -135,6 +135,7 @@ body.detail-open {
 .date-range-filter {
   display: grid;
   gap: 8px;
+  min-width: 0;
   color: #596475;
   font-size: 14px;
   font-weight: 800;
@@ -144,6 +145,7 @@ body.detail-open {
 .filter-bar select,
 .filter-bar button {
   width: 100%;
+  min-width: 0;
   min-height: 46px;
   border: 1px solid #bfc8d6;
   border-radius: 999px;
@@ -161,6 +163,8 @@ body.detail-open {
   color: #ffffff;
   cursor: pointer;
   font-weight: 800;
+  padding-right: 12px;
+  padding-left: 12px;
 }
 
 .date-range-filter {
@@ -777,8 +781,8 @@ body.detail-open {
 
 .firmware-filter-bar {
   grid-template-columns:
-    minmax(170px, 250px) minmax(240px, 340px) minmax(260px, 1fr)
-    minmax(420px, 520px) minmax(118px, 150px);
+    minmax(140px, 210px) minmax(190px, 270px) minmax(220px, 1fr)
+    minmax(340px, 430px) minmax(104px, 132px);
 }
 
 .firmware-summary,
