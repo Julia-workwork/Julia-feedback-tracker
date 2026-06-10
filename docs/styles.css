@@ -777,8 +777,8 @@ body.detail-open {
 
 .firmware-filter-bar {
   grid-template-columns:
-    minmax(180px, 260px) minmax(260px, 360px) minmax(280px, 1fr)
-    minmax(430px, 520px);
+    minmax(170px, 250px) minmax(240px, 340px) minmax(260px, 1fr)
+    minmax(420px, 520px) minmax(118px, 150px);
 }
 
 .firmware-summary,

@@ -89,6 +89,7 @@ const elements = {
   firmwareSearch: document.querySelector("#firmware-search-filter"),
   firmwareDateFrom: document.querySelector("#firmware-date-from-filter"),
   firmwareDateTo: document.querySelector("#firmware-date-to-filter"),
+  firmwareRefresh: document.querySelector("#firmware-refresh-button"),
   firmwareSummary: document.querySelector("#firmware-summary"),
   firmwareMessage: document.querySelector("#firmware-message"),
   firmwareList: document.querySelector("#firmware-list"),
@@ -760,9 +761,9 @@ function openDetail(record) {
       ${editableDetailRow("ING", `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
       ${editableDetailRow("DONE", doneSelectTemplate(record), "short")}
       ${modificationRowsTemplate(record)}
-      ${linkedFirmwareTemplate(record)}
       ${detailRow("Upgrade requirements", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
+      ${linkedFirmwareTemplate(record)}
       ${editableDetailRow("Notes", `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
     </dl>
     <button class="save-detail-changes" type="button">Save Changes</button>
@@ -1017,6 +1018,7 @@ elements.firmwareDateTo.addEventListener("change", () => {
   state.firmwareFilters.dateTo = elements.firmwareDateTo.value;
   renderFirmware();
 });
+elements.firmwareRefresh.addEventListener("click", load);
 elements.firmwareList.addEventListener("click", (event) => {
   const requestButton = event.target.closest(".closed-request-link");
   if (requestButton) {
