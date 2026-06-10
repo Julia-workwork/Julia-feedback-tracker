@@ -908,18 +908,122 @@ body.detail-open {
   text-align: left;
 }
 
-.closed-requests div {
+.closed-requests-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.closed-requests-header h3 {
+  margin-bottom: 0;
+}
+
+.edit-closed-requests {
+  border: 1px solid #c9d4e2;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #11161d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 850;
+  padding: 6px 10px;
+}
+
+.edit-closed-requests:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.closed-request-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 12px;
 }
 
-.closed-requests span {
+.closed-requests span,
+.closed-request-link {
   border-radius: 999px;
+  border: 0;
   background: #f2c230;
   color: #050505;
+  cursor: pointer;
+  font: inherit;
   font-weight: 800;
   padding: 7px 10px;
+}
+
+.closed-request-link:hover,
+.closed-request-link:focus-visible {
+  background: #0874f2;
+  color: #ffffff;
+  outline: 0;
+}
+
+.closed-request-editor {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  border: 1px solid #dce3ed;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.closed-request-editor.is-hidden {
+  display: none;
+}
+
+.closed-request-editor label {
+  display: grid;
+  gap: 8px;
+  color: #596475;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.closed-request-editor textarea {
+  width: 100%;
+  min-height: 76px;
+  border: 1px solid #cad3df;
+  border-radius: 10px;
+  color: #11161d;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 750;
+  line-height: 1.45;
+  padding: 10px;
+  resize: vertical;
+}
+
+.closed-request-editor div {
+  display: flex;
+  gap: 8px;
+}
+
+.closed-request-editor button {
+  border: 1px solid #0874f2;
+  border-radius: 999px;
+  background: #0874f2;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 8px 12px;
+}
+
+.closed-request-editor .cancel-closed-request-edit {
+  border-color: #c9d4e2;
+  background: #ffffff;
+  color: #11161d;
+}
+
+.closed-request-editor button:disabled {
+  cursor: progress;
+  opacity: 0.65;
 }
 
 .linked-firmware {

@@ -8,6 +8,7 @@ import {
   normalizeFirmwareRow,
   normalizeRequestNumber,
   normalizeRow,
+  parseClosedRequests,
   summarizeFeedback,
   summarizeFirmware,
   uniqueFirmwareModels,
@@ -251,9 +252,39 @@ function cardTemplate(record, index) {
   `;
 }
 
-function firmwareCardTemplate(release) {
+function firmwareMatchPayload(release) {
+  return {
+    date: release.date,
+    model: release.model,
+    hardwareVersion: release.hardwareVersion,
+    version: release.version,
+    reasonForChange: release.reasonForChange,
+  };
+}
+
+function syncFirmwareClosedRequests(release, closedRequests, editorCode) {
+  return callGoogleAppsScript({
+    action: "updateFirmwareClosedRequests",
+    closedRequests,
+    editorCode: String(editorCode || "").trim(),
+    match: JSON.stringify(firmwareMatchPayload(release)),
+  }).then((payload) => {
+    if (payload?.ok) return payload;
+    throw new Error(payload?.message || "Update failed.");
+  });
+}
+
+function firmwareCardTemplate(release, index) {
   const closedRequests = release.closedRequests.length
-    ? release.closedRequests.map((request) => `<span>${escapeHtml(request)}</span>`).join("")
+    ? release.closedRequests
+        .map(
+          (request) => `
+            <button class="closed-request-link" type="button" data-request-number="${escapeHtml(request)}">
+              ${escapeHtml(request)}
+            </button>
+          `,
+        )
+        .join("")
     : `<span>-</span>`;
   const metadata = [
     ["Hardware", release.hardwareVersion],
@@ -291,8 +322,21 @@ function firmwareCardTemplate(release) {
           </section>
         </div>
         <div class="closed-requests">
-          <h3>Closed Requests</h3>
-          <div>${closedRequests}</div>
+          <div class="closed-requests-header">
+            <h3>Closed Requests</h3>
+            <button class="edit-closed-requests" type="button" data-release-index="${index}">Edit</button>
+          </div>
+          <div class="closed-request-list">${closedRequests}</div>
+          <form class="closed-request-editor is-hidden" data-release-index="${index}">
+            <label>
+              Closed request numbers
+              <textarea rows="3">${escapeHtml(release.closedRequestsRaw)}</textarea>
+            </label>
+            <div>
+              <button type="submit">Save</button>
+              <button type="button" class="cancel-closed-request-edit">Cancel</button>
+            </div>
+          </form>
         </div>
       </details>
     </article>
@@ -311,7 +355,9 @@ function renderFirmware() {
   } else if (state.firmwareRecords.length) {
     setFirmwareMessage("");
   }
-  elements.firmwareList.innerHTML = visible.length ? visible.map(firmwareCardTemplate).join("") : "";
+  elements.firmwareList.innerHTML = visible.length
+    ? visible.map((release) => firmwareCardTemplate(release, state.firmwareRecords.indexOf(release))).join("")
+    : "";
 }
 
 function renderBoard(records) {
@@ -614,6 +660,12 @@ function firmwarePreview(text) {
 function linkedFirmwareForRecord(record) {
   const key = normalizeRequestNumber(record.requestNumber);
   return key ? state.firmwareLookup.get(key) || [] : [];
+}
+
+function feedbackForRequestNumber(requestNumber) {
+  const key = normalizeRequestNumber(requestNumber);
+  if (!key) return null;
+  return state.records.find((record) => normalizeRequestNumber(record.requestNumber) === key) || null;
 }
 
 function linkedFirmwareTemplate(record) {
@@ -921,6 +973,76 @@ elements.firmwareDateFrom.addEventListener("change", () => {
 elements.firmwareDateTo.addEventListener("change", () => {
   state.firmwareFilters.dateTo = elements.firmwareDateTo.value;
   renderFirmware();
+});
+elements.firmwareList.addEventListener("click", (event) => {
+  const requestButton = event.target.closest(".closed-request-link");
+  if (requestButton) {
+    const record = feedbackForRequestNumber(requestButton.dataset.requestNumber);
+    if (!record) {
+      showToast("No matching feedback found for this request number.");
+      return;
+    }
+    openDetail(record);
+    return;
+  }
+
+  const editButton = event.target.closest(".edit-closed-requests");
+  if (editButton) {
+    const container = editButton.closest(".closed-requests");
+    container?.querySelector(".closed-request-editor")?.classList.remove("is-hidden");
+    editButton.disabled = true;
+  }
+
+  const cancelButton = event.target.closest(".cancel-closed-request-edit");
+  if (cancelButton) {
+    const form = cancelButton.closest(".closed-request-editor");
+    const container = cancelButton.closest(".closed-requests");
+    form?.classList.add("is-hidden");
+    const editButton = container?.querySelector(".edit-closed-requests");
+    if (editButton) editButton.disabled = false;
+  }
+});
+elements.firmwareList.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".closed-request-editor");
+  if (!form) return;
+  event.preventDefault();
+
+  const release = state.firmwareRecords[Number(form.dataset.releaseIndex)];
+  if (!release) {
+    showToast("Firmware release was not found.");
+    return;
+  }
+
+  const editorCode = window.prompt("Enter editor code to save changes:");
+  const cleanEditorCode = String(editorCode || "").trim();
+  if (!cleanEditorCode) {
+    showToast("Edit cancelled");
+    return;
+  }
+
+  const textarea = form.querySelector("textarea");
+  const nextValue = textarea.value.trim();
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Saving...";
+  }
+
+  try {
+    await verifyEditorCode(cleanEditorCode);
+    await syncFirmwareClosedRequests(release, nextValue, cleanEditorCode);
+    release.closedRequestsRaw = nextValue;
+    release.closedRequests = parseClosedRequests(nextValue);
+    state.firmwareLookup = buildFirmwareLookup(state.firmwareRecords);
+    renderFirmware();
+    showToast("Changes saved");
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "Update failed");
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = "Save";
+    }
+  }
 });
 elements.refresh.addEventListener("click", load);
 elements.summary.addEventListener("click", (event) => {
