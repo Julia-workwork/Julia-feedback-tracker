@@ -11,7 +11,6 @@ import {
   summarizeFeedback,
   summarizeFirmware,
   uniqueFirmwareModels,
-  uniqueFirmwareVersions,
   uniqueModels,
 } from "./lib/domain.mjs";
 
@@ -129,16 +128,31 @@ function renderFirmwareFilterOptions() {
   const currentModel = elements.firmwareModel.value;
   const currentVersion = elements.firmwareVersion.value;
   const models = uniqueFirmwareModels(state.firmwareRecords);
-  const versions = uniqueFirmwareVersions(state.firmwareRecords);
+  const selectedModel = models.includes(currentModel) ? currentModel : "all";
+  const versionSource =
+    selectedModel === "all" ? [] : state.firmwareRecords.filter((release) => release.model === selectedModel);
+  const versionByValue = new Map();
+
+  for (const release of versionSource) {
+    if (!release.version || versionByValue.has(release.version)) continue;
+    versionByValue.set(release.version, release);
+  }
+
+  const versions = [...versionByValue.keys()].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 
   elements.firmwareModel.innerHTML = `<option value="all">All Models</option>${models
     .map((model) => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`)
     .join("")}`;
-  elements.firmwareVersion.innerHTML = `<option value="all">All Versions</option>${versions
-    .map((version) => `<option value="${escapeHtml(version)}">${escapeHtml(version)}</option>`)
+  const defaultVersionLabel = selectedModel === "all" ? "Select Model First" : "All Versions";
+  elements.firmwareVersion.innerHTML = `<option value="all">${defaultVersionLabel}</option>${versions
+    .map((version) => {
+      const release = versionByValue.get(version);
+      const parts = [version, release?.date, release?.versionStatus].filter(Boolean);
+      return `<option value="${escapeHtml(version)}">${escapeHtml(parts.join(" · "))}</option>`;
+    })
     .join("")}`;
 
-  elements.firmwareModel.value = models.includes(currentModel) ? currentModel : "all";
+  elements.firmwareModel.value = selectedModel;
   elements.firmwareVersion.value = versions.includes(currentVersion) ? currentVersion : "all";
   state.firmwareFilters.model = elements.firmwareModel.value;
   state.firmwareFilters.version = elements.firmwareVersion.value;
@@ -246,6 +260,7 @@ function firmwareCardTemplate(release) {
     ["Status", release.versionStatus],
     ["Reason", release.reasonForChange],
   ].filter(([, value]) => value);
+  const logPreview = release.changeLog || release.chineseLog || "-";
   return `
     <article class="firmware-card">
       <header>
@@ -266,20 +281,24 @@ function firmwareCardTemplate(release) {
               .join("")}</div>`
           : ""
       }
-      <div class="firmware-log-grid">
-        <section>
-          <h3>Change Log</h3>
-          <p>${escapeHtml(release.changeLog || "-")}</p>
-        </section>
-        <section>
-          <h3>更新日志</h3>
-          <p>${escapeHtml(release.chineseLog || "-")}</p>
-        </section>
-      </div>
-      <div class="closed-requests">
-        <h3>Closed Requests</h3>
-        <div>${closedRequests}</div>
-      </div>
+      <p class="firmware-preview">${escapeHtml(logPreview)}</p>
+      <details class="firmware-details">
+        <summary>View details</summary>
+        <div class="firmware-log-grid">
+          <section>
+            <h3>Change Log</h3>
+            <p>${escapeHtml(release.changeLog || "-")}</p>
+          </section>
+          <section>
+            <h3>更新日志</h3>
+            <p>${escapeHtml(release.chineseLog || "-")}</p>
+          </section>
+        </div>
+        <div class="closed-requests">
+          <h3>Closed Requests</h3>
+          <div>${closedRequests}</div>
+        </div>
+      </details>
     </article>
   `;
 }
@@ -888,6 +907,7 @@ elements.dateTo.addEventListener("change", () => {
 });
 elements.firmwareModel.addEventListener("change", () => {
   state.firmwareFilters.model = elements.firmwareModel.value;
+  renderFirmwareFilterOptions();
   renderFirmware();
 });
 elements.firmwareVersion.addEventListener("change", () => {
