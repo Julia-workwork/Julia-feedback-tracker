@@ -260,16 +260,12 @@ function firmwareCardTemplate(release) {
     ["Status", release.versionStatus],
     ["Reason", release.reasonForChange],
   ].filter(([, value]) => value);
-  const logPreview = release.changeLog || release.chineseLog || "-";
   return `
     <article class="firmware-card">
-      <header>
-        <div>
-          <p>${escapeHtml(release.model || "-")}</p>
-          <h2>${escapeHtml(release.version || "Unknown version")}</h2>
-        </div>
-        <time>${escapeHtml(release.date || "-")}</time>
-      </header>
+      <div class="firmware-title">
+        <p>${escapeHtml(release.model || "-")}</p>
+        <h2>${escapeHtml(release.version || "Unknown version")}</h2>
+      </div>
       ${
         metadata.length
           ? `<div class="firmware-meta">${metadata
@@ -281,7 +277,7 @@ function firmwareCardTemplate(release) {
               .join("")}</div>`
           : ""
       }
-      <p class="firmware-preview">${escapeHtml(logPreview)}</p>
+      <time>${escapeHtml(release.date || "-")}</time>
       <details class="firmware-details">
         <summary>View details</summary>
         <div class="firmware-log-grid">

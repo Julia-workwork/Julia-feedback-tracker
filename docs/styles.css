@@ -779,28 +779,26 @@ body.detail-open {
 
 .firmware-list {
   display: grid;
-  gap: 14px;
+  gap: 8px;
   margin-top: 22px;
 }
 
 .firmware-card {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.9fr) minmax(320px, 1.8fr) auto auto;
+  gap: 14px;
+  align-items: center;
   border: 1px solid #d7dee8;
-  border-radius: 18px;
+  border-radius: 12px;
   background: #f8fafc;
   color: #101820;
-  padding: 20px 22px;
+  padding: 12px 16px;
 }
 
-.firmware-card header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.firmware-card header p {
-  margin: 0 0 4px;
+.firmware-title p {
+  margin: 0 0 2px;
   color: #647284;
+  font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -808,24 +806,25 @@ body.detail-open {
 .firmware-card h2 {
   margin: 0;
   font-family: var(--summary-number-font);
-  font-size: clamp(1.8rem, 3.2vw, 3.2rem);
-  line-height: 0.95;
+  font-size: clamp(1.3rem, 2.2vw, 2rem);
+  line-height: 1;
 }
 
 .firmware-card time {
   border-radius: 999px;
   background: #0874f2;
   color: #ffffff;
+  font-size: 0.9rem;
   font-weight: 800;
-  padding: 10px 14px;
+  padding: 8px 12px;
   white-space: nowrap;
 }
 
 .firmware-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 0;
 }
 
 .firmware-meta span {
@@ -836,42 +835,33 @@ body.detail-open {
   border-radius: 999px;
   background: #ffffff;
   color: #4b5868;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 750;
-  padding: 7px 10px;
+  padding: 6px 9px;
 }
 
 .firmware-meta strong {
   color: #101820;
 }
 
-.firmware-preview {
-  display: -webkit-box;
-  margin: 14px 0 0;
-  overflow: hidden;
-  color: #293342;
-  line-height: 1.45;
-  white-space: pre-line;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
 .firmware-details {
-  margin-top: 14px;
+  display: contents;
 }
 
 .firmware-details summary {
   display: inline-flex;
   align-items: center;
+  justify-self: end;
   border: 1px solid #c9d4e2;
   border-radius: 999px;
   background: #ffffff;
   color: #11161d;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 850;
   list-style: none;
-  padding: 8px 12px;
+  padding: 7px 10px;
+  white-space: nowrap;
 }
 
 .firmware-details summary::-webkit-details-marker {
@@ -879,6 +869,7 @@ body.detail-open {
 }
 
 .firmware-log-grid {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
@@ -907,6 +898,7 @@ body.detail-open {
 }
 
 .closed-requests {
+  grid-column: 1 / -1;
   margin-top: 20px;
 }
 
@@ -980,6 +972,15 @@ body.detail-open {
   .firmware-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .firmware-card {
+    grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.4fr) auto;
+  }
+
+  .firmware-details summary {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1008,16 +1009,12 @@ body.detail-open {
   .status-board,
   .firmware-summary,
   .firmware-log-grid,
+  .firmware-card,
   .date-range-filter {
     grid-template-columns: 1fr;
   }
 
-  .firmware-card header {
-    display: block;
-  }
-
   .firmware-card time {
-    display: inline-block;
-    margin-top: 16px;
+    justify-self: start;
   }
 }
