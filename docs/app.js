@@ -664,8 +664,51 @@ function linkedFirmwareForRecord(record) {
 
 function feedbackForRequestNumber(requestNumber) {
   const key = normalizeRequestNumber(requestNumber);
-  if (!key) return null;
-  return state.records.find((record) => normalizeRequestNumber(record.requestNumber) === key) || null;
+  if (!key) return [];
+  return state.records.filter((record) => normalizeRequestNumber(record.requestNumber) === key);
+}
+
+function requestMatchesTemplate(records) {
+  return `
+    <section class="request-match-picker">
+      <h3>Matching Feedback</h3>
+      ${records
+        .map(
+          (record, index) => `
+            <button type="button" data-match-index="${index}">
+              <strong>${escapeHtml(record.keyPoints || record.upgradeRequirements || "Feedback detail")}</strong>
+              <span>${escapeHtml([record.date, record.model, record.id].filter(Boolean).join(" · ") || "-")}</span>
+            </button>
+          `,
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function openRequestMatches(records) {
+  document.body.classList.add("detail-open");
+  elements.detail.classList.remove("is-hidden");
+  elements.detail.innerHTML = `
+    <div class="detail-panel__header">
+      <div>
+        <h2>Select Feedback</h2>
+      </div>
+      <div class="detail-actions">
+        <button type="button" id="close-detail">Close</button>
+      </div>
+    </div>
+    ${requestMatchesTemplate(records)}
+  `;
+  elements.detail.querySelectorAll("[data-match-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openDetail(records[Number(button.dataset.matchIndex)]);
+    });
+  });
+  document.querySelector("#close-detail").addEventListener("click", () => {
+    elements.detail.classList.add("is-hidden");
+    document.body.classList.remove("detail-open");
+  });
 }
 
 function linkedFirmwareTemplate(record) {
@@ -977,12 +1020,16 @@ elements.firmwareDateTo.addEventListener("change", () => {
 elements.firmwareList.addEventListener("click", (event) => {
   const requestButton = event.target.closest(".closed-request-link");
   if (requestButton) {
-    const record = feedbackForRequestNumber(requestButton.dataset.requestNumber);
-    if (!record) {
+    const matches = feedbackForRequestNumber(requestButton.dataset.requestNumber);
+    if (!matches.length) {
       showToast("No matching feedback found for this request number.");
       return;
     }
-    openDetail(record);
+    if (matches.length === 1) {
+      openDetail(matches[0]);
+      return;
+    }
+    openRequestMatches(matches);
     return;
   }
 
