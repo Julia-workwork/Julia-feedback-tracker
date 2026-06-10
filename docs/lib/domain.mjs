@@ -85,7 +85,9 @@ export function normalizeRow(row) {
 }
 
 export function normalizeRequestNumber(value) {
-  return clean(value).toLowerCase();
+  const text = clean(value);
+  const requestNumber = text.match(/rt\s*[\d-]+/i)?.[0];
+  return clean(requestNumber || text).replace(/\s+/g, "").toLowerCase();
 }
 
 export function parseClosedRequests(input) {
