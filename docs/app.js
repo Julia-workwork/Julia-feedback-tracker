@@ -1,14 +1,22 @@
 import {
   STATUS_LABELS,
+  buildFirmwareLookup,
   categoryClass,
   filterFeedback,
+  filterFirmware,
+  normalizeFirmwareRow,
+  normalizeRequestNumber,
   normalizeRow,
   summarizeFeedback,
+  summarizeFirmware,
+  uniqueFirmwareModels,
+  uniqueFirmwareVersions,
   uniqueModels,
 } from "./lib/domain.mjs";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
-const SHEET_GID = "1702171693";
+const FEEDBACK_SHEET_GID = "1702171693";
+const FIRMWARE_SHEET_NAME = "firmware change log";
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGan0BA3Zsl_EXw0gYkAYrgapvvt1k0oTQZB5uGXi8LqhQsp3KyfqrJv0qyGysL5UN/exec";
 const SHEET_HEADERS_BY_POSITION = [
   "Date",
@@ -31,12 +39,17 @@ const SHEET_HEADERS_BY_POSITION = [
   "Last Modified By",
   "Status Change Log",
 ];
+const FIRMWARE_REQUIRED_HEADERS = ["Date", "Model", "Verion", "Change log", "更新日志", "关闭需求"];
 const EXPECTED_SHEET_HEADERS = new Set([
   ...SHEET_HEADERS_BY_POSITION,
+  ...FIRMWARE_REQUIRED_HEADERS,
 ]);
 
 const state = {
   records: [],
+  firmwareRecords: [],
+  firmwareLookup: new Map(),
+  activeView: "feedback",
   summaryFilter: "",
   filters: {
     model: "all",
@@ -46,9 +59,19 @@ const state = {
     dateFrom: "",
     dateTo: "",
   },
+  firmwareFilters: {
+    model: "all",
+    version: "all",
+    search: "",
+    dateFrom: "",
+    dateTo: "",
+  },
 };
 
 const elements = {
+  viewTabs: document.querySelectorAll("[data-view]"),
+  feedbackView: document.querySelector("#feedback-view"),
+  firmwareView: document.querySelector("#firmware-view"),
   model: document.querySelector("#model-filter"),
   search: document.querySelector("#search-filter"),
   category: document.querySelector("#category-filter"),
@@ -60,6 +83,14 @@ const elements = {
   summary: document.querySelector("#summary"),
   board: document.querySelector("#board"),
   detail: document.querySelector("#detail-panel"),
+  firmwareModel: document.querySelector("#firmware-model-filter"),
+  firmwareVersion: document.querySelector("#firmware-version-filter"),
+  firmwareSearch: document.querySelector("#firmware-search-filter"),
+  firmwareDateFrom: document.querySelector("#firmware-date-from-filter"),
+  firmwareDateTo: document.querySelector("#firmware-date-to-filter"),
+  firmwareSummary: document.querySelector("#firmware-summary"),
+  firmwareMessage: document.querySelector("#firmware-message"),
+  firmwareList: document.querySelector("#firmware-list"),
 };
 
 function escapeHtml(value) {
@@ -77,6 +108,12 @@ function setMessage(text, isError = false) {
   elements.message.classList.toggle("is-hidden", !text);
 }
 
+function setFirmwareMessage(text, isError = false) {
+  elements.firmwareMessage.textContent = text;
+  elements.firmwareMessage.classList.toggle("state-message--error", isError);
+  elements.firmwareMessage.classList.toggle("is-hidden", !text);
+}
+
 function renderModelOptions() {
   const current = elements.model.value;
   const models = uniqueModels(state.records);
@@ -85,6 +122,25 @@ function renderModelOptions() {
     .join("")}`;
   elements.model.value = models.includes(current) ? current : "all";
   state.filters.model = elements.model.value;
+}
+
+function renderFirmwareFilterOptions() {
+  const currentModel = elements.firmwareModel.value;
+  const currentVersion = elements.firmwareVersion.value;
+  const models = uniqueFirmwareModels(state.firmwareRecords);
+  const versions = uniqueFirmwareVersions(state.firmwareRecords);
+
+  elements.firmwareModel.innerHTML = `<option value="all">All Models</option>${models
+    .map((model) => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`)
+    .join("")}`;
+  elements.firmwareVersion.innerHTML = `<option value="all">All Versions</option>${versions
+    .map((version) => `<option value="${escapeHtml(version)}">${escapeHtml(version)}</option>`)
+    .join("")}`;
+
+  elements.firmwareModel.value = models.includes(currentModel) ? currentModel : "all";
+  elements.firmwareVersion.value = versions.includes(currentVersion) ? currentVersion : "all";
+  state.firmwareFilters.model = elements.firmwareModel.value;
+  state.firmwareFilters.version = elements.firmwareVersion.value;
 }
 
 function renderSummary(records) {
@@ -112,6 +168,15 @@ function renderSummary(records) {
       `,
     )
     .join("");
+}
+
+function renderFirmwareSummary(records) {
+  const summary = summarizeFirmware(records);
+  elements.firmwareSummary.innerHTML = `
+    <div><span>Total Releases</span><strong>${summary.total}</strong></div>
+    <div><span>Models</span><strong>${summary.modelCount}</strong></div>
+    <div><span>Closed Requests</span><strong>${summary.closedRequestCount}</strong></div>
+  `;
 }
 
 function applySummaryFilter(records) {
@@ -169,6 +234,52 @@ function cardTemplate(record, index) {
       </div>
     </article>
   `;
+}
+
+function firmwareCardTemplate(release) {
+  const closedRequests = release.closedRequests.length
+    ? release.closedRequests.map((request) => `<span>${escapeHtml(request)}</span>`).join("")
+    : `<span>-</span>`;
+  return `
+    <article class="firmware-card">
+      <header>
+        <div>
+          <p>${escapeHtml(release.model || "-")}</p>
+          <h2>${escapeHtml(release.version || "Unknown version")}</h2>
+        </div>
+        <time>${escapeHtml(release.date || "-")}</time>
+      </header>
+      <div class="firmware-log-grid">
+        <section>
+          <h3>Change Log</h3>
+          <p>${escapeHtml(release.changeLog || "-")}</p>
+        </section>
+        <section>
+          <h3>更新日志</h3>
+          <p>${escapeHtml(release.chineseLog || "-")}</p>
+        </section>
+      </div>
+      <div class="closed-requests">
+        <h3>Closed Requests</h3>
+        <div>${closedRequests}</div>
+      </div>
+    </article>
+  `;
+}
+
+function renderFirmware() {
+  const visible = filterFirmware(state.firmwareRecords, state.firmwareFilters).sort((a, b) =>
+    String(b.date).localeCompare(String(a.date)),
+  );
+  renderFirmwareSummary(visible);
+  if (!state.firmwareRecords.length && !elements.firmwareMessage.textContent) {
+    setFirmwareMessage("No firmware releases found.");
+  } else if (state.firmwareRecords.length && !visible.length) {
+    setFirmwareMessage("No firmware releases match the selected filters.");
+  } else if (state.firmwareRecords.length) {
+    setFirmwareMessage("");
+  }
+  elements.firmwareList.innerHTML = visible.length ? visible.map(firmwareCardTemplate).join("") : "";
 }
 
 function renderBoard(records) {
@@ -459,6 +570,42 @@ function modificationRowsTemplate(record) {
   `;
 }
 
+function cleanText(value) {
+  return String(value || "").trim();
+}
+
+function firmwarePreview(text) {
+  const value = cleanText(text);
+  return value.length > 180 ? `${value.slice(0, 180)}...` : value;
+}
+
+function linkedFirmwareForRecord(record) {
+  const key = normalizeRequestNumber(record.requestNumber);
+  return key ? state.firmwareLookup.get(key) || [] : [];
+}
+
+function linkedFirmwareTemplate(record) {
+  const releases = linkedFirmwareForRecord(record);
+  if (!releases.length) return "";
+
+  return `
+    <section class="linked-firmware">
+      <h3>Resolved in Firmware</h3>
+      ${releases
+        .map(
+          (release) => `
+            <article>
+              <strong>${escapeHtml(release.model || "-")} · ${escapeHtml(release.version || "-")}</strong>
+              <span>${escapeHtml(release.date || "-")}</span>
+              <p>${escapeHtml(firmwarePreview(release.changeLog || release.chineseLog))}</p>
+            </article>
+          `,
+        )
+        .join("")}
+    </section>
+  `;
+}
+
 function openDetail(record) {
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
@@ -486,6 +633,7 @@ function openDetail(record) {
       ${editableDetailRow("ING", `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
       ${editableDetailRow("DONE", doneSelectTemplate(record), "short")}
       ${modificationRowsTemplate(record)}
+      ${linkedFirmwareTemplate(record)}
       ${detailRow("Upgrade requirements", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
       ${editableDetailRow("Notes", `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
@@ -590,15 +738,16 @@ function tableRowsToRecords(table) {
   return parsedRecords;
 }
 
-function loadSheetRows() {
+function loadSheetRows({ gid = "", sheetName = "" }) {
   return new Promise((resolve, reject) => {
-    const callbackName = `handleFeedbackSheet_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const callbackName = `handleSheet_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
     const query = new URLSearchParams({
-      gid: SHEET_GID,
       tq: "select *",
       tqx: `out:json;responseHandler:${callbackName}`,
     });
+    if (gid) query.set("gid", gid);
+    if (sheetName) query.set("sheet", sheetName);
     script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${query.toString()}`;
 
     window[callbackName] = (payload) => {
@@ -606,7 +755,7 @@ function loadSheetRows() {
       script.remove();
 
       if (payload.status !== "ok") {
-        reject(new Error("Feedback data is not available right now."));
+        reject(new Error("Sheet data is not available right now."));
         return;
       }
 
@@ -616,26 +765,86 @@ function loadSheetRows() {
     script.addEventListener("error", () => {
       delete window[callbackName];
       script.remove();
-      reject(new Error("Unable to load feedback data."));
+      reject(new Error("Unable to load sheet data."));
     });
 
     document.head.append(script);
   });
 }
 
+function validateFirmwareRows(rows) {
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  return FIRMWARE_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
+}
+
+async function loadFirmwareRecords() {
+  const rows = await loadSheetRows({ sheetName: FIRMWARE_SHEET_NAME });
+  const missing = validateFirmwareRows(rows);
+  if (missing.length) {
+    throw new Error(`Firmware Change Log is missing columns: ${missing.join(", ")}`);
+  }
+  return rows
+    .map(normalizeFirmwareRow)
+    .filter((release) => release.date || release.model || release.version || release.changeLog);
+}
+
 async function load() {
   setMessage("Loading feedback data...");
+  setFirmwareMessage("Loading firmware data...");
   renderSummary([]);
+  renderFirmwareSummary([]);
   elements.board.innerHTML = "";
+  elements.firmwareList.innerHTML = "";
   try {
-    state.records = (await loadSheetRows()).map(normalizeRow);
+    const [feedbackRows, firmwareResult] = await Promise.allSettled([
+      loadSheetRows({ gid: FEEDBACK_SHEET_GID }),
+      loadFirmwareRecords(),
+    ]);
+
+    if (feedbackRows.status !== "fulfilled") {
+      throw feedbackRows.reason;
+    }
+
+    state.records = feedbackRows.value.map(normalizeRow);
     renderModelOptions();
+
+    if (firmwareResult.status === "fulfilled") {
+      state.firmwareRecords = firmwareResult.value;
+      state.firmwareLookup = buildFirmwareLookup(state.firmwareRecords);
+      renderFirmwareFilterOptions();
+      setFirmwareMessage("");
+    } else {
+      state.firmwareRecords = [];
+      state.firmwareLookup = new Map();
+      setFirmwareMessage(
+        firmwareResult.reason instanceof Error
+          ? firmwareResult.reason.message
+          : "Firmware Change Log is not available yet.",
+        true,
+      );
+    }
+
     render();
+    renderFirmware();
   } catch (error) {
     setMessage(error instanceof Error ? error.message : "Unknown loading error", true);
   }
 }
 
+function setActiveView(view) {
+  state.activeView = view;
+  elements.viewTabs.forEach((button) => {
+    const isActive = button.dataset.view === view;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+  elements.feedbackView.classList.toggle("is-hidden", view !== "feedback");
+  elements.firmwareView.classList.toggle("is-hidden", view !== "firmware");
+}
+
+elements.viewTabs.forEach((button) => {
+  button.addEventListener("click", () => setActiveView(button.dataset.view));
+});
 elements.model.addEventListener("change", () => {
   state.filters.model = elements.model.value;
   render();
@@ -659,6 +868,26 @@ elements.dateFrom.addEventListener("change", () => {
 elements.dateTo.addEventListener("change", () => {
   state.filters.dateTo = elements.dateTo.value;
   render();
+});
+elements.firmwareModel.addEventListener("change", () => {
+  state.firmwareFilters.model = elements.firmwareModel.value;
+  renderFirmware();
+});
+elements.firmwareVersion.addEventListener("change", () => {
+  state.firmwareFilters.version = elements.firmwareVersion.value;
+  renderFirmware();
+});
+elements.firmwareSearch.addEventListener("input", () => {
+  state.firmwareFilters.search = elements.firmwareSearch.value;
+  renderFirmware();
+});
+elements.firmwareDateFrom.addEventListener("change", () => {
+  state.firmwareFilters.dateFrom = elements.firmwareDateFrom.value;
+  renderFirmware();
+});
+elements.firmwareDateTo.addEventListener("change", () => {
+  state.firmwareFilters.dateTo = elements.firmwareDateTo.value;
+  renderFirmware();
 });
 elements.refresh.addEventListener("click", load);
 elements.summary.addEventListener("click", (event) => {

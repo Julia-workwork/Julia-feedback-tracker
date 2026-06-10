@@ -9,8 +9,9 @@
   <body>
     <main class="app-shell">
       <header class="app-header">
-        <nav class="hero-nav" aria-label="Dashboard sections">
-          <span>Overview</span>
+        <nav class="hero-nav view-switch" aria-label="Dashboard sections">
+          <button class="view-tab is-active" type="button" data-view="feedback" aria-pressed="true">Feedback Board</button>
+          <button class="view-tab" type="button" data-view="firmware" aria-pressed="false">Firmware Change Log</button>
           <span>Data Sync <b aria-hidden="true"></b></span>
           <span>Julia</span>
         </nav>
@@ -21,56 +22,93 @@
         </div>
       </header>
 
-      <section class="filter-bar" aria-label="Dashboard filters">
-        <label>
-          Product Model
-          <select id="model-filter">
-            <option value="all">All Models</option>
-          </select>
-        </label>
-        <label class="search-field">
-          Keyword Search
-          <input id="search-filter" placeholder="Search feedback, requests, notes..." />
-        </label>
-        <label>
-          Update Category
-          <select id="category-filter">
-            <option value="">All Categories</option>
-            <option value="BUG">BUG</option>
-            <option value="Feature Request">Feature Request</option>
-            <option value="Feature Enhancement">Feature Enhancement</option>
-            <option value="Positive review">Positive review</option>
-            <option value="Negative review">Negative review</option>
-            <option value="CPS">CPS</option>
-            <option value="APP">APP</option>
-          </select>
-        </label>
-        <label>
-          Priority
-          <select id="priority-filter">
-            <option value="">All Priorities</option>
-            <option value="P0">P0</option>
-            <option value="P1">P1</option>
-            <option value="P2">P2</option>
-          </select>
-        </label>
-        <fieldset class="date-range-filter">
-          <legend>Date Range</legend>
+      <section id="feedback-view" class="dashboard-view" data-view-panel="feedback">
+        <section class="filter-bar" aria-label="Dashboard filters">
           <label>
-            From Date
-            <input id="date-from-filter" type="date" />
+            Product Model
+            <select id="model-filter">
+              <option value="all">All Models</option>
+            </select>
+          </label>
+          <label class="search-field">
+            Keyword Search
+            <input id="search-filter" placeholder="Search feedback, requests, notes..." />
           </label>
           <label>
-            To Date
-            <input id="date-to-filter" type="date" />
+            Update Category
+            <select id="category-filter">
+              <option value="">All Categories</option>
+              <option value="BUG">BUG</option>
+              <option value="Feature Request">Feature Request</option>
+              <option value="Feature Enhancement">Feature Enhancement</option>
+              <option value="Positive review">Positive review</option>
+              <option value="Negative review">Negative review</option>
+              <option value="CPS">CPS</option>
+              <option value="APP">APP</option>
+            </select>
           </label>
-        </fieldset>
-        <button id="refresh-button" type="button">Refresh</button>
+          <label>
+            Priority
+            <select id="priority-filter">
+              <option value="">All Priorities</option>
+              <option value="P0">P0</option>
+              <option value="P1">P1</option>
+              <option value="P2">P2</option>
+            </select>
+          </label>
+          <fieldset class="date-range-filter">
+            <legend>Date Range</legend>
+            <label>
+              From Date
+              <input id="date-from-filter" type="date" />
+            </label>
+            <label>
+              To Date
+              <input id="date-to-filter" type="date" />
+            </label>
+          </fieldset>
+          <button id="refresh-button" type="button">Refresh</button>
+        </section>
+
+        <section id="summary" class="summary-strip" aria-label="Feedback summary"></section>
+        <p id="state-message" class="state-message">Loading feedback data...</p>
+        <section id="board" class="status-board" aria-label="Engineering follow-up board"></section>
       </section>
 
-      <section id="summary" class="summary-strip" aria-label="Feedback summary"></section>
-      <p id="state-message" class="state-message">Loading feedback data...</p>
-      <section id="board" class="status-board" aria-label="Engineering follow-up board"></section>
+      <section id="firmware-view" class="dashboard-view is-hidden" data-view-panel="firmware">
+        <section class="filter-bar firmware-filter-bar" aria-label="Firmware filters">
+          <label>
+            Product Model
+            <select id="firmware-model-filter">
+              <option value="all">All Models</option>
+            </select>
+          </label>
+          <label>
+            Firmware Version
+            <select id="firmware-version-filter">
+              <option value="all">All Versions</option>
+            </select>
+          </label>
+          <label class="search-field">
+            Keyword Search
+            <input id="firmware-search-filter" placeholder="Search firmware logs, versions, closed requests..." />
+          </label>
+          <fieldset class="date-range-filter">
+            <legend>Date Range</legend>
+            <label>
+              From Date
+              <input id="firmware-date-from-filter" type="date" />
+            </label>
+            <label>
+              To Date
+              <input id="firmware-date-to-filter" type="date" />
+            </label>
+          </fieldset>
+        </section>
+        <section id="firmware-summary" class="firmware-summary" aria-label="Firmware release summary"></section>
+        <p id="firmware-message" class="state-message is-hidden"></p>
+        <section id="firmware-list" class="firmware-list" aria-label="Firmware change log"></section>
+      </section>
       <footer class="app-footer">
         © 2026 Julia. All rights reserved. This dashboard is a personal internal tool created for Julia's private workflow. It may not be copied, redistributed, commercialized, or used by any third party without permission.
       </footer>

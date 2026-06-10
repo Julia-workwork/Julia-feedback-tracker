@@ -84,6 +84,49 @@ export function normalizeRow(row) {
   };
 }
 
+export function normalizeRequestNumber(value) {
+  return clean(value).toLowerCase();
+}
+
+export function parseClosedRequests(input) {
+  const seen = new Set();
+  return clean(input)
+    .split(/[\n,，;；\s]+/)
+    .map((part) => clean(part))
+    .filter(Boolean)
+    .filter((part) => {
+      const key = normalizeRequestNumber(part);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+export function normalizeFirmwareRow(row) {
+  return {
+    date: clean(row.Date),
+    model: clean(row.Model),
+    version: clean(row.Verion || row.Version),
+    changeLog: clean(row["Change log"]),
+    chineseLog: clean(row["更新日志"]),
+    closedRequestsRaw: clean(row["关闭需求"]),
+    closedRequests: parseClosedRequests(row["关闭需求"]),
+  };
+}
+
+export function buildFirmwareLookup(releases) {
+  const lookup = new Map();
+  for (const release of releases) {
+    for (const requestNumber of release.closedRequests) {
+      const key = normalizeRequestNumber(requestNumber);
+      const existing = lookup.get(key) || [];
+      existing.push(release);
+      lookup.set(key, existing);
+    }
+  }
+  return lookup;
+}
+
 function normalizedModel(value) {
   return clean(value).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -114,6 +157,18 @@ export function uniqueModels(records) {
     }
   }
   return [...models].sort((a, b) => a.localeCompare(b));
+}
+
+export function uniqueFirmwareModels(releases) {
+  return [...new Set(releases.map((release) => clean(release.model)).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
+
+export function uniqueFirmwareVersions(releases) {
+  return [...new Set(releases.map((release) => clean(release.version)).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b),
+  );
 }
 
 export function filterFeedback(records, filters) {
@@ -150,6 +205,33 @@ export function filterFeedback(records, filters) {
   });
 }
 
+export function filterFirmware(releases, filters) {
+  const model = clean(filters.model);
+  const version = clean(filters.version);
+  const search = clean(filters.search).toLowerCase();
+  const dateFrom = dateKey(filters.dateFrom);
+  const dateTo = dateKey(filters.dateTo);
+
+  return releases.filter((release) => {
+    const releaseDate = dateKey(release.date);
+    const modelMatch = !model || model === "all" || normalizedModel(release.model) === normalizedModel(model);
+    const versionMatch = !version || version === "all" || clean(release.version) === version;
+    const dateFromMatch = !dateFrom || (releaseDate && releaseDate >= dateFrom);
+    const dateToMatch = !dateTo || (releaseDate && releaseDate <= dateTo);
+    const haystack = [
+      release.model,
+      release.version,
+      release.changeLog,
+      release.chineseLog,
+      release.closedRequestsRaw,
+    ]
+      .join("\n")
+      .toLowerCase();
+    const searchMatch = !search || haystack.includes(search);
+    return modelMatch && versionMatch && dateFromMatch && dateToMatch && searchMatch;
+  });
+}
+
 export function summarizeFeedback(records) {
   const statusCounts = {
     todo: 0,
@@ -179,6 +261,20 @@ export function summarizeFeedback(records) {
     statusCounts,
     categoryCounts,
     unresolvedBugs: records.filter((record) => record.status !== "resolved" && record.categories.includes("BUG")).length,
+  };
+}
+
+export function summarizeFirmware(releases) {
+  const closedRequests = new Set();
+  for (const release of releases) {
+    for (const requestNumber of release.closedRequests) {
+      closedRequests.add(normalizeRequestNumber(requestNumber));
+    }
+  }
+  return {
+    total: releases.length,
+    modelCount: uniqueFirmwareModels(releases).length,
+    closedRequestCount: closedRequests.size,
   };
 }
 
