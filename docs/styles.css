@@ -905,6 +905,7 @@ body.detail-open {
 
 .closed-requests {
   margin-top: 20px;
+  text-align: left;
 }
 
 .closed-requests div {
