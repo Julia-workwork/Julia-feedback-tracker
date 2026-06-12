@@ -165,9 +165,8 @@ function modelParts(value) {
   const text = clean(value);
   if (!text) return [];
   const matches = text.match(/[A-Z]+[A-Z0-9]*(?:\/[A-Z0-9]+)?(?:-[A-Z0-9]+)?/gi) || [];
-  const normalizedMatches = matches.map((part) => normalizedModel(part));
   const seen = new Set();
-  const parts = matches
+  return matches
     .map((part) => clean(part).toUpperCase())
     .filter(Boolean)
     .filter((part) => {
@@ -176,10 +175,6 @@ function modelParts(value) {
       seen.add(key);
       return true;
     });
-  if (normalizedMatches.includes("ha1g") && normalizedMatches.includes("ha1uv")) {
-    parts.push("HA1G/UV");
-  }
-  return parts.filter((part, index) => parts.findIndex((item) => normalizedModel(item) === normalizedModel(part)) === index);
 }
 
 function dateKey(value) {

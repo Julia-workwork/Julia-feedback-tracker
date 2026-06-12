@@ -13,7 +13,7 @@ import {
   summarizeFirmware,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260612-model-split";
+} from "./lib/domain.mjs?v=20260612-model-split-2";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
