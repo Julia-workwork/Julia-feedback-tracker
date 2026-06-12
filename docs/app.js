@@ -873,6 +873,7 @@ function loadSheetRows({ gid = "", sheetName = "" }) {
     const query = new URLSearchParams({
       tq: "select *",
       tqx: `out:json;responseHandler:${callbackName}`,
+      cacheBust: String(Date.now()),
     });
     if (gid) query.set("gid", gid);
     if (sheetName) query.set("sheet", sheetName);

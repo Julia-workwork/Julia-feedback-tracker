@@ -161,6 +161,27 @@ function normalizedModel(value) {
   return clean(value).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function modelParts(value) {
+  const text = clean(value);
+  if (!text) return [];
+  const matches = text.match(/[A-Z]+[A-Z0-9]*(?:\/[A-Z0-9]+)?(?:-[A-Z0-9]+)?/gi) || [];
+  const normalizedMatches = matches.map((part) => normalizedModel(part));
+  const seen = new Set();
+  const parts = matches
+    .map((part) => clean(part).toUpperCase())
+    .filter(Boolean)
+    .filter((part) => {
+      const key = normalizedModel(part);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  if (normalizedMatches.includes("ha1g") && normalizedMatches.includes("ha1uv")) {
+    parts.push("HA1G/UV");
+  }
+  return parts.filter((part, index) => parts.findIndex((item) => normalizedModel(item) === normalizedModel(part)) === index);
+}
+
 function dateKey(value) {
   const text = clean(value);
   if (!text) return "";
@@ -181,8 +202,7 @@ function dateKey(value) {
 export function uniqueModels(records) {
   const models = new Set();
   for (const record of records) {
-    const model = clean(record.model);
-    if (model) {
+    for (const model of modelParts(record.model)) {
       models.add(model);
     }
   }
@@ -215,7 +235,8 @@ export function filterFeedback(records, filters) {
     const modelMatch =
       !model ||
       model === "all" ||
-      normalizedModel(record.model) === requestedModel;
+      normalizedModel(record.model) === requestedModel ||
+      modelParts(record.model).some((part) => normalizedModel(part) === requestedModel);
     const categoryMatch = !category || record.categories.includes(category);
     const priorityMatch = !priority || record.priority === priority;
     const dateFromMatch = !dateFrom || (recordDate && recordDate >= dateFrom);
