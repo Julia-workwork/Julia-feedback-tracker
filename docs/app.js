@@ -13,7 +13,7 @@ import {
   summarizeFirmware,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260612-model-split-2";
+} from "./lib/domain.mjs?v=20260613-linked-firmware-fold";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -658,6 +658,10 @@ function firmwarePreview(text) {
   return value.length > 180 ? `${value.slice(0, 180)}...` : value;
 }
 
+function firmwareFullLog(release) {
+  return cleanText(release.changeLog || release.chineseLog || "-");
+}
+
 function linkedFirmwareForRecord(record) {
   const key = normalizeRequestNumber(record.requestNumber);
   return key ? state.firmwareLookup.get(key) || [] : [];
@@ -721,13 +725,28 @@ function linkedFirmwareTemplate(record) {
       <h3>Resolved in Firmware</h3>
       ${releases
         .map(
-          (release) => `
+          (release) => {
+            const fullLog = firmwareFullLog(release);
+            const preview = firmwarePreview(fullLog);
+            const canExpand = fullLog !== preview || fullLog.includes("\n");
+            return `
             <article>
               <strong>${escapeHtml(release.model || "-")} · ${escapeHtml(release.version || "-")}</strong>
               <span>${escapeHtml(release.date || "-")}</span>
-              <p>${escapeHtml(firmwarePreview(release.changeLog || release.chineseLog))}</p>
+              <p class="linked-firmware-preview">${escapeHtml(preview)}</p>
+              ${
+                canExpand
+                  ? `
+                    <details class="linked-firmware-details">
+                      <summary>View full firmware log</summary>
+                      <p>${escapeHtml(fullLog)}</p>
+                    </details>
+                  `
+                  : ""
+              }
             </article>
-          `,
+          `;
+          },
         )
         .join("")}
     </section>

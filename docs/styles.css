@@ -1096,6 +1096,43 @@ body.detail-open {
   margin: 8px 0 0;
 }
 
+.linked-firmware-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: pre-line;
+}
+
+.linked-firmware-details {
+  margin-top: 10px;
+}
+
+.linked-firmware-details summary {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #9ec4ff;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #075fc7;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 900;
+  list-style: none;
+  padding: 7px 11px;
+}
+
+.linked-firmware-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.linked-firmware-details p {
+  border-top: 1px solid #c9dcf7;
+  margin-top: 10px;
+  padding-top: 10px;
+  white-space: pre-line;
+}
+
 .copy-toast {
   position: fixed;
   right: 22px;
