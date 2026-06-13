@@ -727,23 +727,14 @@ function linkedFirmwareTemplate(record) {
         .map(
           (release) => {
             const fullLog = firmwareFullLog(release);
-            const preview = firmwarePreview(fullLog);
-            const canExpand = fullLog !== preview || fullLog.includes("\n");
             return `
             <article>
               <strong>${escapeHtml(release.model || "-")} · ${escapeHtml(release.version || "-")}</strong>
               <span>${escapeHtml(release.date || "-")}</span>
-              <p class="linked-firmware-preview">${escapeHtml(preview)}</p>
-              ${
-                canExpand
-                  ? `
-                    <details class="linked-firmware-details">
-                      <summary>View full firmware log</summary>
-                      <p>${escapeHtml(fullLog)}</p>
-                    </details>
-                  `
-                  : ""
-              }
+              <details class="linked-firmware-details">
+                <summary>View full firmware log</summary>
+                <p>${escapeHtml(fullLog)}</p>
+              </details>
             </article>
           `;
           },
