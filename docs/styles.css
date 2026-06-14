@@ -27,6 +27,91 @@ body.detail-open {
   display: none !important;
 }
 
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background:
+    radial-gradient(circle at 50% 22%, rgb(9 105 255 / 24%), transparent 28%),
+    linear-gradient(180deg, #050505 0%, #090909 100%);
+  color: #ffffff;
+}
+
+.login-card {
+  width: min(520px, 100%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 28px;
+  background: rgb(255 255 255 / 7%);
+  box-shadow: 0 34px 90px rgb(0 0 0 / 34%);
+  backdrop-filter: blur(18px);
+  padding: 34px;
+}
+
+.login-card h1 {
+  margin: 10px 0 14px;
+  color: #ffffff;
+  font-size: clamp(34px, 6vw, 66px);
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.login-card p {
+  color: #d7dce5;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.login-card label {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.login-card input {
+  min-height: 52px;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #11161d;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 750;
+  padding: 0 18px;
+}
+
+.login-card button {
+  width: 100%;
+  min-height: 54px;
+  border: 0;
+  border-radius: 999px;
+  margin-top: 24px;
+  background: #0969ff;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.login-card button:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.login-message {
+  min-height: 22px;
+  margin: 14px 0 0;
+  color: #ffd35a;
+}
+
 .app-shell {
   min-height: 100vh;
   background: #f7f8fb;
@@ -68,6 +153,20 @@ body.detail-open {
   height: 8px;
   border-radius: 999px;
   background: #0969ff;
+}
+
+.logout-button {
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 999px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 8px 12px;
+  text-transform: uppercase;
 }
 
 .hero-copy {

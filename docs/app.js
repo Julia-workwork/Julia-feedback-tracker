@@ -13,7 +13,7 @@ import {
   summarizeFirmware,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260613-linked-firmware-fold";
+} from "./lib/domain.mjs?v=20260615-role-login";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -45,6 +45,8 @@ const EXPECTED_SHEET_HEADERS = new Set([
   ...SHEET_HEADERS_BY_POSITION,
   ...FIRMWARE_REQUIRED_HEADERS,
 ]);
+const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
+const EDIT_ROLES = new Set(["Admin", "Editor"]);
 
 const state = {
   records: [],
@@ -67,9 +69,18 @@ const state = {
     dateFrom: "",
     dateTo: "",
   },
+  auth: null,
 };
 
 const elements = {
+  appShell: document.querySelector(".app-shell"),
+  loginScreen: document.querySelector("#login-screen"),
+  loginForm: document.querySelector("#login-form"),
+  loginUsername: document.querySelector("#login-username"),
+  loginPassword: document.querySelector("#login-password"),
+  loginMessage: document.querySelector("#login-message"),
+  authRole: document.querySelector("#auth-role"),
+  logout: document.querySelector("#logout-button"),
   viewTabs: document.querySelectorAll("[data-view]"),
   feedbackView: document.querySelector("#feedback-view"),
   firmwareView: document.querySelector("#firmware-view"),
@@ -114,6 +125,79 @@ function setFirmwareMessage(text, isError = false) {
   elements.firmwareMessage.textContent = text;
   elements.firmwareMessage.classList.toggle("state-message--error", isError);
   elements.firmwareMessage.classList.toggle("is-hidden", !text);
+}
+
+function canEdit() {
+  return EDIT_ROLES.has(state.auth?.role);
+}
+
+function setLoginMessage(text, isError = false) {
+  elements.loginMessage.textContent = text;
+  elements.loginMessage.classList.toggle("state-message--error", isError);
+}
+
+function saveAuth(auth) {
+  state.auth = auth;
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+}
+
+function clearAuth() {
+  state.auth = null;
+  window.localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+function showLogin() {
+  elements.loginScreen.classList.remove("is-hidden");
+  elements.appShell.classList.add("is-hidden");
+}
+
+function showDashboard() {
+  elements.loginScreen.classList.add("is-hidden");
+  elements.appShell.classList.remove("is-hidden");
+  elements.authRole.textContent = `${state.auth?.role || "Viewer"} · ${state.auth?.username || ""}`;
+}
+
+async function credentialHash(username, password) {
+  if (!window.crypto?.subtle) {
+    throw new Error("This browser cannot securely prepare the login request.");
+  }
+  const text = `${String(username || "").trim().toLowerCase()}:${String(password || "")}`;
+  const bytes = new TextEncoder().encode(text);
+  const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function login(username, password) {
+  const passwordHash = await credentialHash(username, password);
+  const payload = await callGoogleAppsScript({
+    action: "login",
+    username: String(username || "").trim(),
+    passwordHash,
+  });
+  if (!payload?.ok || !payload?.token) {
+    throw new Error(payload?.message || "Login failed.");
+  }
+  return {
+    token: payload.token,
+    username: payload.username,
+    role: payload.role,
+    expiresAt: payload.expiresAt,
+  };
+}
+
+async function verifySession(auth) {
+  if (!auth?.token) return null;
+  const payload = await callGoogleAppsScript({
+    action: "session",
+    authToken: auth.token,
+  });
+  if (!payload?.ok) return null;
+  return {
+    token: auth.token,
+    username: payload.username,
+    role: payload.role,
+    expiresAt: payload.expiresAt,
+  };
 }
 
 function renderModelOptions() {
@@ -263,11 +347,11 @@ function firmwareMatchPayload(release) {
   };
 }
 
-function syncFirmwareClosedRequests(release, closedRequests, editorCode) {
+function syncFirmwareClosedRequests(release, closedRequests) {
   return callGoogleAppsScript({
     action: "updateFirmwareClosedRequests",
     closedRequests,
-    editorCode: String(editorCode || "").trim(),
+    authToken: state.auth?.token || "",
     match: JSON.stringify(firmwareMatchPayload(release)),
   }).then((payload) => {
     if (payload?.ok) return payload;
@@ -325,19 +409,29 @@ function firmwareCardTemplate(release, index) {
         <div class="closed-requests">
           <div class="closed-requests-header">
             <h3>Closed Requests</h3>
-            <button class="edit-closed-requests" type="button" data-release-index="${index}">Edit</button>
+            ${
+              canEdit()
+                ? `<button class="edit-closed-requests" type="button" data-release-index="${index}">Edit</button>`
+                : ""
+            }
           </div>
           <div class="closed-request-list">${closedRequests}</div>
-          <form class="closed-request-editor is-hidden" data-release-index="${index}">
-            <label>
-              Closed request numbers
-              <textarea rows="3">${escapeHtml(release.closedRequestsRaw)}</textarea>
-            </label>
-            <div>
-              <button type="submit">Save</button>
-              <button type="button" class="cancel-closed-request-edit">Cancel</button>
-            </div>
-          </form>
+          ${
+            canEdit()
+              ? `
+                <form class="closed-request-editor is-hidden" data-release-index="${index}">
+                  <label>
+                    Closed request numbers
+                    <textarea rows="3">${escapeHtml(release.closedRequestsRaw)}</textarea>
+                  </label>
+                  <div>
+                    <button type="submit">Save</button>
+                    <button type="button" class="cancel-closed-request-edit">Cancel</button>
+                  </div>
+                </form>
+              `
+              : ""
+          }
         </div>
       </details>
     </article>
@@ -498,21 +592,21 @@ function callGoogleAppsScript(params) {
   });
 }
 
-async function verifyEditorCode(editorCode) {
+async function verifyEditPermission() {
   const payload = await callGoogleAppsScript({
     action: "ping",
-    editorCode: String(editorCode || "").trim(),
+    authToken: state.auth?.token || "",
   });
   if (!payload?.ok || !payload?.canEdit) {
-    throw new Error("Edit code was rejected by this dashboard endpoint.");
+    throw new Error("You do not have permission to edit.");
   }
 }
 
-function syncChangesToGoogleSheet(record, changes, editorCode) {
+function syncChangesToGoogleSheet(record, changes) {
   return callGoogleAppsScript({
       status: changes["Dashboard Status"] || "",
       changes: JSON.stringify(changes),
-      editorCode: String(editorCode || "").trim(),
+      authToken: state.auth?.token || "",
       match: JSON.stringify(recordMatchPayload(record)),
     }).then((payload) => {
       if (payload?.ok) return payload;
@@ -520,10 +614,10 @@ function syncChangesToGoogleSheet(record, changes, editorCode) {
     });
 }
 
-async function saveRecordChanges(record, changes, editorCode) {
+async function saveRecordChanges(record, changes) {
   showToast("Saving changes...");
   try {
-    const result = await syncChangesToGoogleSheet(record, changes, editorCode);
+    const result = await syncChangesToGoogleSheet(record, changes);
     applySavedChanges(record, changes, result);
     const filtered = filterFeedback(state.records, state.filters);
     renderSummary(filtered);
@@ -569,6 +663,10 @@ function detailRow(label, value) {
 
 function editableDetailRow(label, fieldHtml, size = "medium") {
   return `<div class="detail-editable-row detail-editable-row--${size}"><dt>${escapeHtml(label)}</dt><dd>${fieldHtml}</dd></div>`;
+}
+
+function permissionAwareDetailRow(label, value, fieldHtml, size = "medium") {
+  return canEdit() ? editableDetailRow(label, fieldHtml, size) : detailRow(label, value);
 }
 
 function statusSelectTemplate(record) {
@@ -766,23 +864,27 @@ function openDetail(record) {
       ${detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
-      ${editableDetailRow("Status", statusSelectTemplate(record), "short")}
-      ${editableDetailRow("Priority", prioritySelectTemplate(record), "short")}
-      ${editableDetailRow("Request number", `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
-      ${editableDetailRow("ING", `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
-      ${editableDetailRow("DONE", doneSelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Status", STATUS_LABELS[record.status] || "-", statusSelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Priority", record.priority, prioritySelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Request number", record.requestNumber, `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
+      ${permissionAwareDetailRow("ING", record.ing, `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
+      ${permissionAwareDetailRow("DONE", record.done, doneSelectTemplate(record), "short")}
       ${modificationRowsTemplate(record)}
       ${detailRow("Upgrade requirements", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
-      ${editableDetailRow("Notes", `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
+      ${permissionAwareDetailRow("Notes", record.notes, `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
     </dl>
-    <button class="save-detail-changes" type="button">Save Changes</button>
+    ${canEdit() ? `<button class="save-detail-changes" type="button">Save Changes</button>` : ""}
   `;
   document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
     await copyEngineerSummary(record);
     showToast("Engineer summary copied");
   });
-  document.querySelector(".save-detail-changes").addEventListener("click", async () => {
+  document.querySelector(".save-detail-changes")?.addEventListener("click", async () => {
+    if (!canEdit()) {
+      showToast("You do not have permission to edit.");
+      return;
+    }
     const changes = changedFields(record);
     if (!Object.keys(changes).length) {
       showToast("No changes to save");
@@ -790,16 +892,10 @@ function openDetail(record) {
     }
     const confirmed = window.confirm(`Confirm changes?\n\n${changesSummary(record, changes)}`);
     if (!confirmed) return;
-    const editorCode = window.prompt("Enter editor code to save changes:");
-    const cleanEditorCode = String(editorCode || "").trim();
-    if (!cleanEditorCode) {
-      showToast("Edit cancelled");
-      return;
-    }
     setDetailSaving(true);
     try {
-      await verifyEditorCode(cleanEditorCode);
-      await saveRecordChanges(record, changes, cleanEditorCode);
+      await verifyEditPermission();
+      await saveRecordChanges(record, changes);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Update failed");
     }
@@ -1073,10 +1169,8 @@ elements.firmwareList.addEventListener("submit", async (event) => {
     return;
   }
 
-  const editorCode = window.prompt("Enter editor code to save changes:");
-  const cleanEditorCode = String(editorCode || "").trim();
-  if (!cleanEditorCode) {
-    showToast("Edit cancelled");
+  if (!canEdit()) {
+    showToast("You do not have permission to edit.");
     return;
   }
 
@@ -1089,8 +1183,8 @@ elements.firmwareList.addEventListener("submit", async (event) => {
   }
 
   try {
-    await verifyEditorCode(cleanEditorCode);
-    await syncFirmwareClosedRequests(release, nextValue, cleanEditorCode);
+    await verifyEditPermission();
+    await syncFirmwareClosedRequests(release, nextValue);
     release.closedRequestsRaw = nextValue;
     release.closedRequests = parseClosedRequests(nextValue);
     state.firmwareLookup = buildFirmwareLookup(state.firmwareRecords);
@@ -1114,4 +1208,75 @@ elements.summary.addEventListener("click", (event) => {
   render();
 });
 
-load();
+elements.loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const username = elements.loginUsername.value.trim();
+  const password = elements.loginPassword.value;
+  if (!username || !password) {
+    setLoginMessage("Enter account and password.", true);
+    return;
+  }
+
+  const submitButton = elements.loginForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  submitButton.textContent = "Signing in...";
+  setLoginMessage("");
+
+  try {
+    const auth = await login(username, password);
+    saveAuth(auth);
+    elements.loginPassword.value = "";
+    showDashboard();
+    await load();
+  } catch (error) {
+    clearAuth();
+    showLogin();
+    setLoginMessage(error instanceof Error ? error.message : "Login failed.", true);
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "Sign in";
+  }
+});
+
+elements.logout.addEventListener("click", async () => {
+  if (state.auth?.token) {
+    callGoogleAppsScript({ action: "logout", authToken: state.auth.token }).catch(() => {});
+  }
+  clearAuth();
+  elements.board.innerHTML = "";
+  elements.firmwareList.innerHTML = "";
+  renderSummary([]);
+  renderFirmwareSummary([]);
+  showLogin();
+});
+
+async function initAuth() {
+  showLogin();
+  let saved = null;
+  try {
+    saved = JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) || "null");
+  } catch {
+    clearAuth();
+  }
+  if (!saved?.token) return;
+
+  setLoginMessage("Checking saved session...");
+  try {
+    const auth = await verifySession(saved);
+    if (!auth) {
+      clearAuth();
+      setLoginMessage("");
+      return;
+    }
+    saveAuth(auth);
+    setLoginMessage("");
+    showDashboard();
+    await load();
+  } catch {
+    clearAuth();
+    setLoginMessage("");
+    showLogin();
+  }
+}
+
+initAuth();

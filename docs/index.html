@@ -7,13 +7,32 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="app-shell">
+    <section id="login-screen" class="login-screen">
+      <form id="login-form" class="login-card">
+        <p class="eyebrow">Julia's Feedback Tracker</p>
+        <h1>Engineering Follow-up Dashboard</h1>
+        <p>Private internal tool. Sign in to continue.</p>
+        <label>
+          Account
+          <input id="login-username" name="username" autocomplete="username" required />
+        </label>
+        <label>
+          Password
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Sign in</button>
+        <p id="login-message" class="login-message" role="status"></p>
+      </form>
+    </section>
+
+    <main class="app-shell is-hidden">
       <header class="app-header">
         <nav class="hero-nav view-switch" aria-label="Dashboard sections">
           <button class="view-tab is-active" type="button" data-view="feedback" aria-pressed="true">Feedback Board</button>
           <button class="view-tab" type="button" data-view="firmware" aria-pressed="false">Firmware Change Log</button>
           <span>Data Sync <b aria-hidden="true"></b></span>
-          <span>Julia</span>
+          <span id="auth-role">Viewer</span>
+          <button id="logout-button" class="logout-button" type="button">Log out</button>
         </nav>
         <div class="hero-copy">
           <p class="eyebrow">Julia's Feedback Tracker</p>
@@ -116,6 +135,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260613-linked-firmware-compact"></script>
+    <script type="module" src="./app.js?v=20260615-role-login"></script>
   </body>
 </html>
