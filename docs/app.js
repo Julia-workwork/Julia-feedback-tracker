@@ -942,37 +942,77 @@ function buildRecordsFromHeaders(tableRows, headers) {
     .map((row) => {
       const record = {};
       headers.forEach((header, index) => {
-        if (!header) return;
-        record[header] = sheetCellValue(row, index);
+        const canonicalHeader = canonicalSheetHeader(header);
+        if (!canonicalHeader) return;
+        record[canonicalHeader] = sheetCellValue(row, index);
       });
       return record;
     })
     .filter(hasAnyValue);
 }
 
+function normalizeSheetHeader(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+const CANONICAL_SHEET_HEADERS = new Map(
+  [...EXPECTED_SHEET_HEADERS].map((header) => [normalizeSheetHeader(header), header]),
+);
+
+function canonicalSheetHeader(value) {
+  const text = String(value || "").trim();
+  return CANONICAL_SHEET_HEADERS.get(normalizeSheetHeader(text)) || text;
+}
+
+function headerScore(headers) {
+  return headers.filter((header) => EXPECTED_SHEET_HEADERS.has(canonicalSheetHeader(header))).length;
+}
+
+function tableRowValues(row) {
+  return row?.c.map((_, index) => sheetCellValue(row, index)) || [];
+}
+
+function recordsFromDetectedHeaderRow(tableRows) {
+  const searchLimit = Math.min(tableRows.length, 40);
+  let bestIndex = -1;
+  let bestScore = 0;
+
+  for (let index = 0; index < searchLimit; index += 1) {
+    const values = tableRowValues(tableRows[index]);
+    const score = headerScore(values);
+    if (score > bestScore) {
+      bestIndex = index;
+      bestScore = score;
+    }
+  }
+
+  if (bestIndex >= 0 && bestScore >= 3) {
+    return buildRecordsFromHeaders(tableRows.slice(bestIndex + 1), tableRowValues(tableRows[bestIndex]));
+  }
+
+  return null;
+}
+
 function tableRowsToRecords(table) {
-  const labels = table.cols.map((column) => String(column.label || "").trim());
-  const ids = table.cols.map((column) => String(column.id || "").trim());
-  const labelsHaveExpectedHeaders = labels.some((label) => EXPECTED_SHEET_HEADERS.has(label));
+  const labels = table.cols.map((column) => canonicalSheetHeader(column.label));
+  const ids = table.cols.map((column) => canonicalSheetHeader(column.id));
+  const labelsHaveExpectedHeaders = headerScore(labels) > 0;
   const headers = labelsHaveExpectedHeaders ? labels : ids;
   const parsedRecords = buildRecordsFromHeaders(table.rows, headers);
 
-  if (headers.some((header) => EXPECTED_SHEET_HEADERS.has(header))) {
+  if (headerScore(headers) > 0) {
     return parsedRecords;
   }
 
-  const firstRowHeaders = table.rows[0]?.c.map((_, index) => sheetCellValue(table.rows[0], index)) || [];
-  const firstRowHasExpectedHeaders = firstRowHeaders.some((header) => EXPECTED_SHEET_HEADERS.has(header));
-  if (firstRowHasExpectedHeaders) {
-    return buildRecordsFromHeaders(table.rows.slice(1), firstRowHeaders);
+  const detectedHeaderRecords = recordsFromDetectedHeaderRow(table.rows);
+  if (detectedHeaderRecords) {
+    return detectedHeaderRecords;
   }
 
-  const idsLookLikeColumnLetters = ids.every((id) => /^[A-Z]+$/.test(id));
-  if (idsLookLikeColumnLetters) {
-    return buildRecordsFromHeaders(table.rows, SHEET_HEADERS_BY_POSITION);
-  }
-
-  return parsedRecords;
+  throw new Error("Sheet header row was not detected. Please keep the field names row visible in the first 40 rows.");
 }
 
 function loadSheetRows({ gid = "", sheetName = "" }) {
