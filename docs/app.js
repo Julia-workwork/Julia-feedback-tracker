@@ -14,7 +14,7 @@ import {
   summarizeFirmware,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260617-headers-1";
+} from "./lib/domain.mjs?v=20260617-model-cleanup";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
