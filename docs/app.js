@@ -14,7 +14,7 @@ import {
   summarizeFirmware,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260617-summary-percent";
+} from "./lib/domain.mjs?v=20260617-headers-1";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -1022,6 +1022,7 @@ function loadSheetRows({ gid = "", sheetName = "" }) {
     const query = new URLSearchParams({
       tq: "select *",
       tqx: `out:json;responseHandler:${callbackName}`,
+      headers: "1",
       cacheBust: String(Date.now()),
     });
     if (gid) query.set("gid", gid);
