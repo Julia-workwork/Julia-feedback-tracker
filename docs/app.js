@@ -9,11 +9,12 @@ import {
   normalizeRequestNumber,
   normalizeRow,
   parseClosedRequests,
+  summaryPercentages,
   summarizeFeedback,
   summarizeFirmware,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260615-role-login";
+} from "./lib/domain.mjs?v=20260617-summary-percent";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -246,17 +247,18 @@ function renderFirmwareFilterOptions() {
 
 function renderSummary(records) {
   const summary = summarizeFeedback(records);
+  const percentages = summaryPercentages(summary);
   const items = [
-    ["total", "Total", summary.total, "summary-total"],
-    ["todo", "To Submit", summary.statusCounts.todo, "summary-todo"],
-    ["submitted", "Submitted", summary.statusCounts.submitted, "summary-submitted"],
-    ["inProgress", "In Progress", summary.statusCounts.inProgress, "summary-progress"],
-    ["resolved", "Resolved", summary.statusCounts.resolved, "summary-resolved"],
-    ["unresolvedBug", "Unresolved BUG", summary.unresolvedBugs, "summary-bug"],
+    ["total", "Total", summary.total, "summary-total", ""],
+    ["todo", "To Submit", summary.statusCounts.todo, "summary-todo", percentages.todo],
+    ["submitted", "Submitted", summary.statusCounts.submitted, "summary-submitted", percentages.submitted],
+    ["inProgress", "In Progress", summary.statusCounts.inProgress, "summary-progress", percentages.inProgress],
+    ["resolved", "Resolved", summary.statusCounts.resolved, "summary-resolved", percentages.resolved],
+    ["unresolvedBug", "Unresolved BUG", summary.unresolvedBugs, "summary-bug", percentages.unresolvedBug],
   ];
   elements.summary.innerHTML = items
     .map(
-      ([key, label, value, className]) => `
+      ([key, label, value, className, percent]) => `
         <button
           class="${className}${state.summaryFilter === key ? " is-active" : ""}"
           type="button"
@@ -264,6 +266,7 @@ function renderSummary(records) {
           aria-pressed="${state.summaryFilter === key ? "true" : "false"}"
         >
           <span>${escapeHtml(label)}</span>
+          ${percent ? `<small class="summary-percent">${escapeHtml(percent)}</small>` : ""}
           <strong>${value}</strong>
         </button>
       `,
