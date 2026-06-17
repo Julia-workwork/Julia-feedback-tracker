@@ -313,6 +313,23 @@ export function summarizeFeedback(records) {
   };
 }
 
+function formatPercent(numerator, denominator) {
+  if (!denominator) return "-";
+  return `${((numerator / denominator) * 100).toFixed(1)}%`;
+}
+
+export function summaryPercentages(summary) {
+  const total = summary.total || 0;
+  const submitted = summary.statusCounts?.submitted || 0;
+  return {
+    todo: formatPercent(summary.statusCounts?.todo || 0, total),
+    submitted: formatPercent(submitted, total),
+    inProgress: formatPercent(summary.statusCounts?.inProgress || 0, total),
+    resolved: formatPercent(summary.statusCounts?.resolved || 0, total),
+    unresolvedBug: formatPercent(summary.unresolvedBugs || 0, submitted),
+  };
+}
+
 export function summarizeFirmware(releases) {
   const closedRequests = new Set();
   for (const release of releases) {
