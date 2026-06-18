@@ -1243,6 +1243,297 @@ body.detail-open {
   white-space: pre-line;
 }
 
+.quick-input-panel,
+.beta-summary,
+.beta-list {
+  width: calc(100% - 64px);
+  max-width: 1760px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.quick-input-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.72fr) minmax(0, 1.4fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 34px;
+  border: 1px solid #12151b;
+  border-radius: 26px;
+  background:
+    linear-gradient(135deg, rgb(8 116 242 / 16%), transparent 38%),
+    #101217;
+  color: #ffffff;
+  box-shadow: 0 28px 72px rgb(22 31 45 / 18%);
+  padding: 28px;
+}
+
+.quick-input-panel h2 {
+  max-width: 520px;
+  margin: 12px 0 0;
+  color: #ffffff;
+  font-size: clamp(1.7rem, 3vw, 3rem);
+  line-height: 1;
+}
+
+.beta-input-form {
+  display: grid;
+  gap: 14px;
+}
+
+.beta-input-form label {
+  display: grid;
+  gap: 7px;
+  color: #e6ebf3;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.beta-input-form input,
+.beta-input-form select,
+.beta-input-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 16px;
+  background: #ffffff;
+  color: #11161d;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 750;
+  padding: 12px 14px;
+}
+
+.beta-input-form select,
+.beta-input-form input {
+  min-height: 44px;
+  border-radius: 999px;
+}
+
+.beta-input-form textarea {
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.beta-raw-field textarea {
+  min-height: 132px;
+  border: 2px solid #35bdb1;
+  background: #eafffc;
+}
+
+.beta-input-grid,
+.beta-draft-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.beta-draft-grid {
+  grid-template-columns: minmax(0, 1.4fr) minmax(120px, 0.55fr) minmax(120px, 0.55fr) minmax(140px, 0.7fr);
+}
+
+.beta-draft-grid label:first-child,
+.beta-draft-grid label:last-child {
+  grid-column: span 2;
+}
+
+.quick-input-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.quick-input-actions button {
+  min-height: 42px;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #050505;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 950;
+  padding: 0 18px;
+}
+
+.quick-input-actions #beta-save-button {
+  border-color: #f2c230;
+  background: #f2c230;
+}
+
+.quick-input-actions button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.beta-filter-bar {
+  grid-template-columns:
+    minmax(132px, 190px) minmax(150px, 220px) minmax(150px, 210px)
+    minmax(132px, 190px) minmax(120px, 160px) minmax(220px, 1fr)
+    minmax(300px, 380px) minmax(104px, 132px);
+}
+
+.beta-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.beta-summary div {
+  --beta-accent: #0874f2;
+  min-height: 118px;
+  border: 2px solid var(--beta-accent);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgb(22 31 45 / 8%);
+  padding: 20px;
+}
+
+.beta-summary .beta-total {
+  --beta-accent: #050505;
+}
+
+.beta-summary .beta-open {
+  --beta-accent: #f2c230;
+}
+
+.beta-summary .beta-progress {
+  --beta-accent: #0874f2;
+}
+
+.beta-summary .beta-resolved {
+  --beta-accent: #35bdb1;
+}
+
+.beta-summary .beta-high {
+  --beta-accent: #e72b3e;
+}
+
+.beta-summary .beta-user {
+  --beta-accent: #7048d8;
+}
+
+.beta-summary span {
+  display: block;
+  color: #596475;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.beta-summary strong {
+  display: block;
+  margin-top: 12px;
+  font-family: var(--summary-number-font);
+  font-size: clamp(2.4rem, 4vw, 4.7rem);
+  line-height: 0.85;
+}
+
+.beta-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.beta-card {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.4fr) minmax(220px, 0.9fr) minmax(220px, 0.8fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: center;
+  border: 1px solid #d7dee8;
+  border-radius: 14px;
+  background: #ffffff;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.beta-card:hover,
+.beta-card:focus-visible {
+  border-color: #0874f2;
+  box-shadow: 0 18px 42px rgb(8 116 242 / 12%);
+  outline: 0;
+  transform: translateY(-2px);
+}
+
+.beta-card p {
+  margin: 0;
+  color: #647284;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.beta-card h3 {
+  margin: 5px 0 0;
+  color: #11161d;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.beta-card-meta,
+.beta-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.beta-card-meta span,
+.severity-pill,
+.status-pill {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border: 1px solid #dce3ed;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #11161d;
+  font-size: 0.76rem;
+  font-weight: 850;
+  padding: 5px 10px;
+}
+
+.severity-critical {
+  border-color: #e72b3e;
+  background: #e72b3e;
+  color: #ffffff;
+}
+
+.severity-high {
+  border-color: #ff7f00;
+  background: #ff7f00;
+  color: #050505;
+}
+
+.severity-medium {
+  border-color: #f2c230;
+  background: #fff4c7;
+}
+
+.severity-low {
+  border-color: #35bdb1;
+  background: #eafffc;
+}
+
+.status-pill {
+  border-color: #0874f2;
+  color: #075fc7;
+}
+
+.beta-next-action {
+  color: #3b4654 !important;
+  font-size: 0.86rem !important;
+  font-weight: 750 !important;
+  line-height: 1.35;
+  text-transform: none !important;
+}
+
 .copy-toast {
   position: fixed;
   right: 22px;
@@ -1267,14 +1558,32 @@ body.detail-open {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .firmware-filter-bar .date-range-filter {
+  .beta-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .firmware-filter-bar .date-range-filter,
+  .beta-filter-bar .date-range-filter {
     grid-column: 1 / -1;
   }
 
   .summary-strip,
   .status-board,
-  .firmware-summary {
+  .firmware-summary,
+  .beta-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-input-panel,
+  .beta-input-grid,
+  .beta-draft-grid,
+  .beta-card {
+    grid-template-columns: 1fr;
+  }
+
+  .beta-draft-grid label:first-child,
+  .beta-draft-grid label:last-child {
+    grid-column: auto;
   }
 
   .firmware-card {
@@ -1300,21 +1609,29 @@ body.detail-open {
 
   .filter-bar,
   .summary-strip,
-  .status-board,
-  .firmware-summary,
-  .firmware-list,
-  .state-message,
-  .app-footer {
+    .status-board,
+    .firmware-summary,
+    .beta-summary,
+    .quick-input-panel,
+    .beta-list,
+    .firmware-list,
+    .state-message,
+    .app-footer {
     width: min(100% - 28px, 1740px);
   }
 
   .filter-bar,
   .summary-strip,
-  .status-board,
-  .firmware-summary,
-  .firmware-log-grid,
-  .firmware-card,
-  .date-range-filter {
+    .status-board,
+    .firmware-summary,
+    .beta-summary,
+    .quick-input-panel,
+    .beta-input-grid,
+    .beta-draft-grid,
+    .beta-card,
+    .firmware-log-grid,
+    .firmware-card,
+    .date-range-filter {
     grid-template-columns: 1fr;
   }
 

@@ -22,6 +22,30 @@ export const STATUS_BY_LABEL = {
   Resolved: "resolved",
 };
 
+export const BETA_TEST_HEADERS = [
+  "Date",
+  "Product Model",
+  "Version",
+  "Test Type",
+  "Tester Type",
+  "Tester / Owner",
+  "Issue Source",
+  "Test Item",
+  "Issue Found",
+  "Severity",
+  "Priority",
+  "Status",
+  "Assigned To",
+  "Engineering Response",
+  "Next Action",
+  "Target Date",
+  "Resolved Date",
+  "Related Request Number",
+  "Related Firmware Version",
+  "Notes",
+  "Raw Input",
+];
+
 export function clean(value) {
   return String(value ?? "").trim();
 }
@@ -119,6 +143,32 @@ export function normalizeFirmwareRow(row) {
   };
 }
 
+export function normalizeBetaRow(row) {
+  return {
+    date: clean(row.Date),
+    productModel: clean(row["Product Model"]),
+    version: clean(row.Version),
+    testType: clean(row["Test Type"]),
+    testerType: clean(row["Tester Type"]),
+    testerOwner: clean(row["Tester / Owner"]),
+    issueSource: clean(row["Issue Source"]),
+    testItem: clean(row["Test Item"]),
+    issueFound: clean(row["Issue Found"]),
+    severity: clean(row.Severity),
+    priority: clean(row.Priority),
+    status: clean(row.Status),
+    assignedTo: clean(row["Assigned To"]),
+    engineeringResponse: clean(row["Engineering Response"]),
+    nextAction: clean(row["Next Action"]),
+    targetDate: clean(row["Target Date"]),
+    resolvedDate: clean(row["Resolved Date"]),
+    relatedRequestNumber: clean(row["Related Request Number"]),
+    relatedFirmwareVersion: clean(row["Related Firmware Version"]),
+    notes: clean(row.Notes),
+    rawInput: clean(row["Raw Input"]),
+  };
+}
+
 export function isFirmwareReleaseLikeFeedbackRow(row) {
   const updateCategory = clean(row["Update Category"]);
   const id = clean(row.ID);
@@ -161,14 +211,47 @@ function normalizedModel(value) {
   return clean(value).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+const KNOWN_MODELS = ["EZTALK65", "RA89R", "HA1UV", "HA1G", "HA2", "HD1", "HD2", "MA1", "M17", "H1", "A3"];
+const NON_MODEL_WORDS = new Set([
+  "APP",
+  "CPS",
+  "DUAL",
+  "PTT",
+  "QRP",
+  "SDR",
+  "TRANSCEIVER",
+  "RETEVIS",
+  "RADIO",
+  "RADIOS",
+  "FIRMWARE",
+  "VERSION",
+]);
+
+function addModel(models, value) {
+  const model = clean(value).toUpperCase();
+  if (!model || NON_MODEL_WORDS.has(model) || /^V\d/i.test(model)) return;
+  if (KNOWN_MODELS.includes(model) || /^[A-Z]{1,8}\d[A-Z0-9-]*$/.test(model)) {
+    models.push(model);
+  }
+}
+
 function modelParts(value) {
   const text = clean(value);
   if (!text) return [];
   const matches = text.match(/[A-Z]+[A-Z0-9]*(?:\/[A-Z0-9]+)?(?:-[A-Z0-9]+)?/gi) || [];
+  const models = [];
+  for (const match of matches) {
+    const slash = match.match(/^([A-Z]+\d+[A-Z0-9]*?)\/([A-Z][A-Z0-9]*)$/i);
+    if (slash) {
+      addModel(models, slash[1]);
+      const prefix = slash[1].match(/^([A-Z]+\d+)/i)?.[1] || "";
+      addModel(models, `${prefix}${slash[2]}`);
+      continue;
+    }
+    addModel(models, match);
+  }
   const seen = new Set();
-  return matches
-    .map((part) => clean(part).toUpperCase())
-    .filter(Boolean)
+  return models
     .filter((part) => {
       const key = normalizedModel(part);
       if (seen.has(key)) return false;
@@ -214,6 +297,31 @@ export function uniqueFirmwareVersions(releases) {
   return [...new Set(releases.map((release) => clean(release.version)).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b),
   );
+}
+
+export function uniqueBetaModels(records) {
+  const models = new Set();
+  for (const record of records) {
+    for (const model of modelParts(record.productModel)) {
+      models.add(model);
+    }
+  }
+  return [...models].sort((a, b) => a.localeCompare(b));
+}
+
+export function uniqueBetaVersions(records, model = "all") {
+  const requestedModel = normalizedModel(model);
+  return [
+    ...new Set(
+      records
+        .filter((record) => {
+          if (!model || model === "all") return true;
+          return modelParts(record.productModel).some((part) => normalizedModel(part) === requestedModel);
+        })
+        .map((record) => clean(record.version))
+        .filter(Boolean),
+    ),
+  ].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 }
 
 export function filterFeedback(records, filters) {
@@ -281,6 +389,69 @@ export function filterFirmware(releases, filters) {
   });
 }
 
+export function filterBetaTests(records, filters) {
+  const model = clean(filters.model);
+  const version = clean(filters.version);
+  const testType = clean(filters.testType);
+  const testerType = clean(filters.testerType);
+  const status = clean(filters.status);
+  const priority = clean(filters.priority);
+  const search = clean(filters.search).toLowerCase();
+  const dateFrom = dateKey(filters.dateFrom);
+  const dateTo = dateKey(filters.dateTo);
+  const requestedModel = normalizedModel(model);
+
+  return records.filter((record) => {
+    const recordDate = dateKey(record.date);
+    const modelMatch =
+      !model ||
+      model === "all" ||
+      normalizedModel(record.productModel) === requestedModel ||
+      modelParts(record.productModel).some((part) => normalizedModel(part) === requestedModel);
+    const versionMatch = !version || version === "all" || record.version === version;
+    const testTypeMatch = !testType || record.testType === testType;
+    const testerTypeMatch = !testerType || record.testerType === testerType;
+    const statusMatch = !status || record.status === status;
+    const priorityMatch = !priority || record.priority === priority;
+    const dateFromMatch = !dateFrom || (recordDate && recordDate >= dateFrom);
+    const dateToMatch = !dateTo || (recordDate && recordDate <= dateTo);
+    const haystack = [
+      record.productModel,
+      record.version,
+      record.testType,
+      record.testerType,
+      record.testerOwner,
+      record.issueSource,
+      record.testItem,
+      record.issueFound,
+      record.severity,
+      record.priority,
+      record.status,
+      record.assignedTo,
+      record.engineeringResponse,
+      record.nextAction,
+      record.relatedRequestNumber,
+      record.relatedFirmwareVersion,
+      record.notes,
+      record.rawInput,
+    ]
+      .join("\n")
+      .toLowerCase();
+    const searchMatch = !search || haystack.includes(search);
+    return (
+      modelMatch &&
+      versionMatch &&
+      testTypeMatch &&
+      testerTypeMatch &&
+      statusMatch &&
+      priorityMatch &&
+      dateFromMatch &&
+      dateToMatch &&
+      searchMatch
+    );
+  });
+}
+
 export function summarizeFeedback(records) {
   const statusCounts = {
     todo: 0,
@@ -341,6 +512,59 @@ export function summarizeFirmware(releases) {
     total: releases.length,
     modelCount: uniqueFirmwareModels(releases).length,
     closedRequestCount: closedRequests.size,
+  };
+}
+
+export function summarizeBetaTests(records) {
+  const openStatuses = new Set(["Open", "Need Review", "Reproducing", "In Progress"]);
+  const resolvedStatuses = new Set(["Resolved", "Closed", "Fixed"]);
+  const highSeverity = new Set(["Critical", "High"]);
+  return {
+    total: records.length,
+    open: records.filter((record) => openStatuses.has(record.status)).length,
+    inProgress: records.filter((record) => record.status === "In Progress").length,
+    resolved: records.filter((record) => resolvedStatuses.has(record.status)).length,
+    highSeverity: records.filter((record) => highSeverity.has(record.severity)).length,
+    userTestIssues: records.filter((record) => /user|beta|koc/i.test(record.testerType || record.issueSource)).length,
+  };
+}
+
+function firstMeaningfulLine(text) {
+  return (
+    clean(text)
+      .split(/\n+/)
+      .map((line) => clean(line).replace(/^[-*•\d.)、\s]+/, ""))
+      .find(Boolean) || ""
+  );
+}
+
+export function inferBetaDraft(input) {
+  const rawInput = clean(input);
+  const lower = rawInput.toLowerCase();
+  const issueFound = firstMeaningfulLine(rawInput);
+  let severity = "Medium";
+  if (/(crash|reboot|brick|cannot power|dead|freeze|卡死|死机|重启|无法开机|变砖)/i.test(rawInput)) {
+    severity = "Critical";
+  } else if (/(fail|cannot|no audio|no tx|no rx|wrong|严重|失败|无法|没有声音|不能发射|不能接收)/i.test(rawInput)) {
+    severity = "High";
+  } else if (/(minor|typo|display|ui|小问题|显示|文案)/i.test(rawInput)) {
+    severity = "Low";
+  }
+
+  const priority = severity === "Critical" ? "P0" : severity === "High" ? "P1" : "P2";
+  const status = lower.includes("fixed") || lower.includes("resolved") || /已修复|已解决/.test(rawInput) ? "Resolved" : "Open";
+  const nextAction =
+    status === "Resolved"
+      ? "Verify fix in the next test round."
+      : "Reproduce the issue, confirm affected version, and assign engineering owner.";
+
+  return {
+    issueFound,
+    severity,
+    priority,
+    status,
+    nextAction,
+    rawInput,
   };
 }
 

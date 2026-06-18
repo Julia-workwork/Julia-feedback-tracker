@@ -1,24 +1,32 @@
 import {
+  BETA_TEST_HEADERS,
   STATUS_LABELS,
   buildFirmwareLookup,
   categoryClass,
+  filterBetaTests,
   filterFeedback,
   filterFirmware,
+  inferBetaDraft,
   isFirmwareReleaseLikeFeedbackRow,
+  normalizeBetaRow,
   normalizeFirmwareRow,
   normalizeRequestNumber,
   normalizeRow,
   parseClosedRequests,
   summaryPercentages,
+  summarizeBetaTests,
   summarizeFeedback,
   summarizeFirmware,
+  uniqueBetaModels,
+  uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260617-model-cleanup";
+} from "./lib/domain.mjs?v=20260618-beta-input";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
 const FIRMWARE_SHEET_NAME = "firmware change log";
+const BETA_SHEET_NAME = "Beta Test Progress";
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGan0BA3Zsl_EXw0gYkAYrgapvvt1k0oTQZB5uGXi8LqhQsp3KyfqrJv0qyGysL5UN/exec";
 const SHEET_HEADERS_BY_POSITION = [
   "Date",
@@ -42,9 +50,11 @@ const SHEET_HEADERS_BY_POSITION = [
   "Status Change Log",
 ];
 const FIRMWARE_REQUIRED_HEADERS = ["Date", "Model", "Firmware Version", "Change log", "更新日志", "关闭需求"];
+const BETA_REQUIRED_HEADERS = ["Date", "Product Model", "Version", "Issue Found", "Status", "Raw Input"];
 const EXPECTED_SHEET_HEADERS = new Set([
   ...SHEET_HEADERS_BY_POSITION,
   ...FIRMWARE_REQUIRED_HEADERS,
+  ...BETA_TEST_HEADERS,
 ]);
 const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
 const EDIT_ROLES = new Set(["Admin", "Editor"]);
@@ -52,6 +62,7 @@ const EDIT_ROLES = new Set(["Admin", "Editor"]);
 const state = {
   records: [],
   firmwareRecords: [],
+  betaRecords: [],
   firmwareLookup: new Map(),
   activeView: "feedback",
   summaryFilter: "",
@@ -66,6 +77,16 @@ const state = {
   firmwareFilters: {
     model: "all",
     version: "all",
+    search: "",
+    dateFrom: "",
+    dateTo: "",
+  },
+  betaFilters: {
+    model: "all",
+    version: "all",
+    testerType: "",
+    status: "",
+    priority: "",
     search: "",
     dateFrom: "",
     dateTo: "",
@@ -85,6 +106,7 @@ const elements = {
   viewTabs: document.querySelectorAll("[data-view]"),
   feedbackView: document.querySelector("#feedback-view"),
   firmwareView: document.querySelector("#firmware-view"),
+  betaView: document.querySelector("#beta-view"),
   model: document.querySelector("#model-filter"),
   search: document.querySelector("#search-filter"),
   category: document.querySelector("#category-filter"),
@@ -105,6 +127,35 @@ const elements = {
   firmwareSummary: document.querySelector("#firmware-summary"),
   firmwareMessage: document.querySelector("#firmware-message"),
   firmwareList: document.querySelector("#firmware-list"),
+  betaInputForm: document.querySelector("#beta-input-form"),
+  betaRawInput: document.querySelector("#beta-raw-input"),
+  betaInputDate: document.querySelector("#beta-input-date"),
+  betaInputModel: document.querySelector("#beta-input-model"),
+  betaInputVersion: document.querySelector("#beta-input-version"),
+  betaInputTestType: document.querySelector("#beta-input-test-type"),
+  betaInputTesterType: document.querySelector("#beta-input-tester-type"),
+  betaInputTesterOwner: document.querySelector("#beta-input-tester-owner"),
+  betaInputIssueFound: document.querySelector("#beta-input-issue-found"),
+  betaInputSeverity: document.querySelector("#beta-input-severity"),
+  betaInputPriority: document.querySelector("#beta-input-priority"),
+  betaInputStatus: document.querySelector("#beta-input-status"),
+  betaInputNextAction: document.querySelector("#beta-input-next-action"),
+  betaAnalyze: document.querySelector("#beta-analyze-button"),
+  betaSave: document.querySelector("#beta-save-button"),
+  betaClear: document.querySelector("#beta-clear-button"),
+  betaInputMessage: document.querySelector("#beta-input-message"),
+  betaModel: document.querySelector("#beta-model-filter"),
+  betaVersion: document.querySelector("#beta-version-filter"),
+  betaTesterType: document.querySelector("#beta-tester-type-filter"),
+  betaStatus: document.querySelector("#beta-status-filter"),
+  betaPriority: document.querySelector("#beta-priority-filter"),
+  betaSearch: document.querySelector("#beta-search-filter"),
+  betaDateFrom: document.querySelector("#beta-date-from-filter"),
+  betaDateTo: document.querySelector("#beta-date-to-filter"),
+  betaRefresh: document.querySelector("#beta-refresh-button"),
+  betaSummary: document.querySelector("#beta-summary"),
+  betaMessage: document.querySelector("#beta-message"),
+  betaList: document.querySelector("#beta-list"),
 };
 
 function escapeHtml(value) {
@@ -126,6 +177,18 @@ function setFirmwareMessage(text, isError = false) {
   elements.firmwareMessage.textContent = text;
   elements.firmwareMessage.classList.toggle("state-message--error", isError);
   elements.firmwareMessage.classList.toggle("is-hidden", !text);
+}
+
+function setBetaMessage(text, isError = false) {
+  elements.betaMessage.textContent = text;
+  elements.betaMessage.classList.toggle("state-message--error", isError);
+  elements.betaMessage.classList.toggle("is-hidden", !text);
+}
+
+function setBetaInputMessage(text, isError = false) {
+  elements.betaInputMessage.textContent = text;
+  elements.betaInputMessage.classList.toggle("state-message--error", isError);
+  elements.betaInputMessage.classList.toggle("is-hidden", !text);
 }
 
 function canEdit() {
@@ -245,6 +308,26 @@ function renderFirmwareFilterOptions() {
   state.firmwareFilters.version = elements.firmwareVersion.value;
 }
 
+function renderBetaFilterOptions() {
+  const currentModel = elements.betaModel.value;
+  const currentVersion = elements.betaVersion.value;
+  const models = uniqueBetaModels(state.betaRecords);
+  const selectedModel = models.includes(currentModel) ? currentModel : "all";
+  const versions = uniqueBetaVersions(state.betaRecords, selectedModel);
+
+  elements.betaModel.innerHTML = `<option value="all">All Models</option>${models
+    .map((model) => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`)
+    .join("")}`;
+  elements.betaVersion.innerHTML = `<option value="all">All Versions</option>${versions
+    .map((version) => `<option value="${escapeHtml(version)}">${escapeHtml(version)}</option>`)
+    .join("")}`;
+
+  elements.betaModel.value = selectedModel;
+  elements.betaVersion.value = versions.includes(currentVersion) ? currentVersion : "all";
+  state.betaFilters.model = elements.betaModel.value;
+  state.betaFilters.version = elements.betaVersion.value;
+}
+
 function renderSummary(records) {
   const summary = summarizeFeedback(records);
   const percentages = summaryPercentages(summary);
@@ -281,6 +364,28 @@ function renderFirmwareSummary(records) {
     <div><span>Models</span><strong>${summary.modelCount}</strong></div>
     <div><span>Closed Requests</span><strong>${summary.closedRequestCount}</strong></div>
   `;
+}
+
+function renderBetaSummary(records) {
+  const summary = summarizeBetaTests(records);
+  const items = [
+    ["Total Issues", summary.total, "beta-total"],
+    ["Open", summary.open, "beta-open"],
+    ["In Progress", summary.inProgress, "beta-progress"],
+    ["Resolved", summary.resolved, "beta-resolved"],
+    ["Critical / High", summary.highSeverity, "beta-high"],
+    ["User Test Issues", summary.userTestIssues, "beta-user"],
+  ];
+  elements.betaSummary.innerHTML = items
+    .map(
+      ([label, value, className]) => `
+        <div class="${className}">
+          <span>${escapeHtml(label)}</span>
+          <strong>${value}</strong>
+        </div>
+      `,
+    )
+    .join("");
 }
 
 function applySummaryFilter(records) {
@@ -458,6 +563,113 @@ function renderFirmware() {
     : "";
 }
 
+function betaSeverityClass(severity) {
+  const value = cleanText(severity).toLowerCase();
+  if (value === "critical") return "severity-critical";
+  if (value === "high") return "severity-high";
+  if (value === "medium") return "severity-medium";
+  if (value === "low") return "severity-low";
+  return "severity-unknown";
+}
+
+function betaRecordTemplate(record, index) {
+  const chips = [
+    record.severity ? `<span class="severity-pill ${betaSeverityClass(record.severity)}">${escapeHtml(record.severity)}</span>` : "",
+    record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : "",
+    record.status ? `<span class="status-pill">${escapeHtml(record.status)}</span>` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+  return `
+    <article class="beta-card" data-beta-index="${index}" role="button" tabindex="0">
+      <div>
+        <p>${escapeHtml(record.productModel || "-")}</p>
+        <h3>${escapeHtml(record.issueFound || record.rawInput || "No issue summary")}</h3>
+      </div>
+      <div class="beta-card-meta">
+        <span>${escapeHtml(record.version || "-")}</span>
+        <span>${escapeHtml(record.testType || "-")}</span>
+        <span>${escapeHtml(record.testerOwner || "-")}</span>
+      </div>
+      <div class="beta-card-chips">${chips}</div>
+      <p class="beta-next-action">${escapeHtml(record.nextAction || record.notes || "-")}</p>
+    </article>
+  `;
+}
+
+function openBetaDetail(record) {
+  document.body.classList.add("detail-open");
+  elements.detail.classList.remove("is-hidden");
+  elements.detail.innerHTML = `
+    <div class="detail-panel__header">
+      <div>
+        <div class="beta-card-chips">
+          ${record.severity ? `<span class="severity-pill ${betaSeverityClass(record.severity)}">${escapeHtml(record.severity)}</span>` : ""}
+          ${record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : ""}
+          ${record.status ? `<span class="status-pill">${escapeHtml(record.status)}</span>` : ""}
+        </div>
+        <h2>${escapeHtml(record.issueFound || "Beta test detail")}</h2>
+      </div>
+      <div class="detail-actions">
+        <button type="button" id="close-detail">Close</button>
+      </div>
+    </div>
+    <dl class="detail-list">
+      ${detailRow("Date", record.date)}
+      ${detailRow("Product Model", record.productModel)}
+      ${detailRow("Version", record.version)}
+      ${detailRow("Test Type", record.testType)}
+      ${detailRow("Tester Type", record.testerType)}
+      ${detailRow("Tester / Owner", record.testerOwner)}
+      ${detailRow("Issue Source", record.issueSource)}
+      ${detailRow("Test Item", record.testItem)}
+      ${detailRow("Issue Found", record.issueFound)}
+      ${detailRow("Severity", record.severity)}
+      ${detailRow("Priority", record.priority)}
+      ${detailRow("Status", record.status)}
+      ${detailRow("Assigned To", record.assignedTo)}
+      ${detailRow("Engineering Response", record.engineeringResponse)}
+      ${detailRow("Next Action", record.nextAction)}
+      ${detailRow("Target Date", record.targetDate)}
+      ${detailRow("Resolved Date", record.resolvedDate)}
+      ${detailRow("Related Request Number", record.relatedRequestNumber)}
+      ${detailRow("Related Firmware Version", record.relatedFirmwareVersion)}
+      ${detailRow("Notes", record.notes)}
+      ${detailRow("Raw Input", record.rawInput)}
+    </dl>
+  `;
+  document.querySelector("#close-detail").addEventListener("click", () => {
+    elements.detail.classList.add("is-hidden");
+    document.body.classList.remove("detail-open");
+  });
+}
+
+function renderBeta() {
+  const visible = filterBetaTests(state.betaRecords, state.betaFilters).sort((a, b) =>
+    String(b.date).localeCompare(String(a.date)),
+  );
+  renderBetaSummary(visible);
+  if (!state.betaRecords.length && !elements.betaMessage.textContent) {
+    setBetaMessage("No beta test records found.");
+  } else if (state.betaRecords.length && !visible.length) {
+    setBetaMessage("No beta test records match the selected filters.");
+  } else if (state.betaRecords.length) {
+    setBetaMessage("");
+  }
+  elements.betaList.innerHTML = visible.length
+    ? visible.map((record) => betaRecordTemplate(record, state.betaRecords.indexOf(record))).join("")
+    : "";
+
+  elements.betaList.querySelectorAll(".beta-card").forEach((card) => {
+    card.addEventListener("click", () => openBetaDetail(state.betaRecords[Number(card.dataset.betaIndex)]));
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openBetaDetail(state.betaRecords[Number(card.dataset.betaIndex)]);
+    });
+  });
+}
+
 function renderBoard(records) {
   const columns = ["todo", "submitted", "inProgress", "resolved"];
   elements.board.innerHTML = columns
@@ -607,6 +819,7 @@ async function verifyEditPermission() {
 
 function syncChangesToGoogleSheet(record, changes) {
   return callGoogleAppsScript({
+      action: "updateFeedbackFields",
       status: changes["Dashboard Status"] || "",
       changes: JSON.stringify(changes),
       authToken: state.auth?.token || "",
@@ -615,6 +828,101 @@ function syncChangesToGoogleSheet(record, changes) {
       if (payload?.ok) return payload;
       throw new Error(payload?.message || "Update failed.");
     });
+}
+
+function betaPayloadFromInput() {
+  return {
+    Date: elements.betaInputDate.value.trim(),
+    "Product Model": elements.betaInputModel.value.trim(),
+    Version: elements.betaInputVersion.value.trim(),
+    "Test Type": elements.betaInputTestType.value.trim(),
+    "Tester Type": elements.betaInputTesterType.value.trim(),
+    "Tester / Owner": elements.betaInputTesterOwner.value.trim(),
+    "Issue Source": elements.betaInputTesterType.value.trim(),
+    "Test Item": "",
+    "Issue Found": elements.betaInputIssueFound.value.trim(),
+    Severity: elements.betaInputSeverity.value.trim(),
+    Priority: elements.betaInputPriority.value.trim(),
+    Status: elements.betaInputStatus.value.trim(),
+    "Assigned To": "",
+    "Engineering Response": "",
+    "Next Action": elements.betaInputNextAction.value.trim(),
+    "Target Date": "",
+    "Resolved Date": "",
+    "Related Request Number": "",
+    "Related Firmware Version": elements.betaInputVersion.value.trim(),
+    Notes: "",
+    "Raw Input": elements.betaRawInput.value.trim(),
+  };
+}
+
+function syncBetaTestRecord(record) {
+  return callGoogleAppsScript({
+    action: "addBetaTestRecord",
+    authToken: state.auth?.token || "",
+    record: JSON.stringify(record),
+  }).then((payload) => {
+    if (payload?.ok) return payload;
+    throw new Error(payload?.message || "Save failed.");
+  });
+}
+
+function analyzeBetaInput() {
+  const rawInput = elements.betaRawInput.value.trim();
+  if (!rawInput) {
+    setBetaInputMessage("Paste beta test content first.", true);
+    return;
+  }
+  const draft = inferBetaDraft(rawInput);
+  if (!elements.betaInputDate.value) {
+    elements.betaInputDate.value = new Date().toISOString().slice(0, 10);
+  }
+  elements.betaInputIssueFound.value = draft.issueFound;
+  elements.betaInputSeverity.value = draft.severity;
+  elements.betaInputPriority.value = draft.priority;
+  elements.betaInputStatus.value = draft.status;
+  elements.betaInputNextAction.value = draft.nextAction;
+  setBetaInputMessage("Draft generated. Review it, then save to Sheet.");
+}
+
+function clearBetaInput() {
+  elements.betaInputForm.reset();
+  elements.betaInputPriority.value = "P2";
+  elements.betaInputSeverity.value = "Medium";
+  elements.betaInputStatus.value = "Open";
+  setBetaInputMessage("");
+}
+
+async function saveBetaInput() {
+  if (!canEdit()) {
+    setBetaInputMessage("You do not have permission to save records.", true);
+    return;
+  }
+  if (!elements.betaRawInput.value.trim()) {
+    setBetaInputMessage("Raw Input is required.", true);
+    return;
+  }
+  if (!elements.betaInputIssueFound.value.trim()) {
+    analyzeBetaInput();
+  }
+  const record = betaPayloadFromInput();
+  elements.betaSave.disabled = true;
+  elements.betaSave.textContent = "Saving...";
+  setBetaInputMessage("Saving beta test record...");
+  try {
+    await verifyEditPermission();
+    await syncBetaTestRecord(record);
+    state.betaRecords.unshift(normalizeBetaRow(record));
+    renderBetaFilterOptions();
+    renderBeta();
+    clearBetaInput();
+    setBetaInputMessage("Saved to Beta Test Progress.");
+  } catch (error) {
+    setBetaInputMessage(error instanceof Error ? error.message : "Save failed.", true);
+  } finally {
+    elements.betaSave.disabled = false;
+    elements.betaSave.textContent = "Save to Sheet";
+  }
 }
 
 async function saveRecordChanges(record, changes) {
@@ -1056,6 +1364,11 @@ function validateFirmwareRows(rows) {
   return FIRMWARE_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
 }
 
+function validateBetaRows(rows) {
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  return BETA_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
+}
+
 async function loadFirmwareRecords() {
   const rows = await loadSheetRows({ sheetName: FIRMWARE_SHEET_NAME });
   const missing = validateFirmwareRows(rows);
@@ -1067,17 +1380,32 @@ async function loadFirmwareRecords() {
     .filter((release) => release.date || release.model || release.version || release.changeLog);
 }
 
+async function loadBetaRecords() {
+  const rows = await loadSheetRows({ sheetName: BETA_SHEET_NAME });
+  const missing = validateBetaRows(rows);
+  if (missing.length) {
+    throw new Error(`Beta Test Progress is missing columns: ${missing.join(", ")}`);
+  }
+  return rows
+    .map(normalizeBetaRow)
+    .filter((record) => record.date || record.productModel || record.issueFound || record.rawInput);
+}
+
 async function load() {
   setMessage("Loading feedback data...");
   setFirmwareMessage("Loading firmware data...");
+  setBetaMessage("Loading beta test data...");
   renderSummary([]);
   renderFirmwareSummary([]);
+  renderBetaSummary([]);
   elements.board.innerHTML = "";
   elements.firmwareList.innerHTML = "";
+  elements.betaList.innerHTML = "";
   try {
-    const [feedbackRows, firmwareResult] = await Promise.allSettled([
+    const [feedbackRows, firmwareResult, betaResult] = await Promise.allSettled([
       loadSheetRows({ gid: FEEDBACK_SHEET_GID }),
       loadFirmwareRecords(),
+      loadBetaRecords(),
     ]);
 
     if (feedbackRows.status !== "fulfilled") {
@@ -1103,8 +1431,21 @@ async function load() {
       );
     }
 
+    if (betaResult.status === "fulfilled") {
+      state.betaRecords = betaResult.value;
+      renderBetaFilterOptions();
+      setBetaMessage("");
+    } else {
+      state.betaRecords = [];
+      setBetaMessage(
+        betaResult.reason instanceof Error ? betaResult.reason.message : "Beta Test Progress is not available yet.",
+        true,
+      );
+    }
+
     render();
     renderFirmware();
+    renderBeta();
   } catch (error) {
     setMessage(error instanceof Error ? error.message : "Unknown loading error", true);
   }
@@ -1119,6 +1460,7 @@ function setActiveView(view) {
   });
   elements.feedbackView.classList.toggle("is-hidden", view !== "feedback");
   elements.firmwareView.classList.toggle("is-hidden", view !== "firmware");
+  elements.betaView.classList.toggle("is-hidden", view !== "beta");
 }
 
 elements.viewTabs.forEach((button) => {
@@ -1170,6 +1512,46 @@ elements.firmwareDateTo.addEventListener("change", () => {
   renderFirmware();
 });
 elements.firmwareRefresh.addEventListener("click", load);
+elements.betaModel.addEventListener("change", () => {
+  state.betaFilters.model = elements.betaModel.value;
+  renderBetaFilterOptions();
+  renderBeta();
+});
+elements.betaVersion.addEventListener("change", () => {
+  state.betaFilters.version = elements.betaVersion.value;
+  renderBeta();
+});
+elements.betaTesterType.addEventListener("change", () => {
+  state.betaFilters.testerType = elements.betaTesterType.value;
+  renderBeta();
+});
+elements.betaStatus.addEventListener("change", () => {
+  state.betaFilters.status = elements.betaStatus.value;
+  renderBeta();
+});
+elements.betaPriority.addEventListener("change", () => {
+  state.betaFilters.priority = elements.betaPriority.value;
+  renderBeta();
+});
+elements.betaSearch.addEventListener("input", () => {
+  state.betaFilters.search = elements.betaSearch.value;
+  renderBeta();
+});
+elements.betaDateFrom.addEventListener("change", () => {
+  state.betaFilters.dateFrom = elements.betaDateFrom.value;
+  renderBeta();
+});
+elements.betaDateTo.addEventListener("change", () => {
+  state.betaFilters.dateTo = elements.betaDateTo.value;
+  renderBeta();
+});
+elements.betaRefresh.addEventListener("click", load);
+elements.betaAnalyze.addEventListener("click", analyzeBetaInput);
+elements.betaClear.addEventListener("click", clearBetaInput);
+elements.betaInputForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveBetaInput();
+});
 elements.firmwareList.addEventListener("click", (event) => {
   const requestButton = event.target.closest(".closed-request-link");
   if (requestButton) {
@@ -1289,8 +1671,10 @@ elements.logout.addEventListener("click", async () => {
   clearAuth();
   elements.board.innerHTML = "";
   elements.firmwareList.innerHTML = "";
+  elements.betaList.innerHTML = "";
   renderSummary([]);
   renderFirmwareSummary([]);
+  renderBetaSummary([]);
   showLogin();
 });
 
