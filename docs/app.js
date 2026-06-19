@@ -21,7 +21,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-empty-beta-ok";
+} from "./lib/domain.mjs?v=20260620-beta-row2-header";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -1321,6 +1321,13 @@ function hasRequiredHeaders(headers, requiredHeaders) {
 }
 
 function tableRowsToRecords(table, requiredHeaders = []) {
+  if (requiredHeaders.length) {
+    const detectedHeaderRecords = recordsFromDetectedHeaderRow(table.rows);
+    if (detectedHeaderRecords) {
+      return detectedHeaderRecords;
+    }
+  }
+
   const labels = table.cols.map((column) => canonicalSheetHeader(column.label));
   const ids = table.cols.map((column) => canonicalSheetHeader(column.id));
   const labelsHaveExpectedHeaders = headerScore(labels) > 0;
@@ -1331,9 +1338,9 @@ function tableRowsToRecords(table, requiredHeaders = []) {
     return parsedRecords;
   }
 
-  const detectedHeaderRecords = recordsFromDetectedHeaderRow(table.rows);
-  if (detectedHeaderRecords) {
-    return detectedHeaderRecords;
+  const fallbackHeaderRecords = recordsFromDetectedHeaderRow(table.rows);
+  if (fallbackHeaderRecords) {
+    return fallbackHeaderRecords;
   }
 
   throw new Error("Sheet header row was not detected. Please keep the field names row visible in the first 40 rows.");
@@ -1346,7 +1353,7 @@ function loadSheetRows({ gid = "", sheetName = "", requiredHeaders = [] }) {
     const query = new URLSearchParams({
       tq: "select *",
       tqx: `out:json;responseHandler:${callbackName}`,
-      headers: "1",
+      headers: requiredHeaders.length ? "0" : "1",
       cacheBust: String(Date.now()),
     });
     if (gid) query.set("gid", gid);
