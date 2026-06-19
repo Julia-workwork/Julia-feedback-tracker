@@ -7,13 +7,33 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="app-shell">
+    <section id="login-screen" class="login-screen">
+      <form id="login-form" class="login-card">
+        <p class="eyebrow">Julia's Feedback Tracker</p>
+        <h1>Engineering Follow-up Dashboard</h1>
+        <p>Private internal tool. Sign in to continue.</p>
+        <label>
+          Account
+          <input id="login-username" name="username" autocomplete="username" required />
+        </label>
+        <label>
+          Password
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Sign in</button>
+        <p id="login-message" class="login-message" role="status"></p>
+      </form>
+    </section>
+
+    <main class="app-shell is-hidden">
       <header class="app-header">
         <nav class="hero-nav view-switch" aria-label="Dashboard sections">
           <button class="view-tab is-active" type="button" data-view="feedback" aria-pressed="true">Feedback Board</button>
           <button class="view-tab" type="button" data-view="firmware" aria-pressed="false">Firmware Change Log</button>
+          <button class="view-tab" type="button" data-view="beta" aria-pressed="false">Beta Test Progress</button>
           <span>Data Sync <b aria-hidden="true"></b></span>
-          <span>Julia</span>
+          <span id="auth-role">Viewer</span>
+          <button id="logout-button" class="logout-button" type="button">Log out</button>
         </nav>
         <div class="hero-copy">
           <p class="eyebrow">Julia's Feedback Tracker</p>
@@ -110,12 +130,180 @@
         <p id="firmware-message" class="state-message is-hidden"></p>
         <section id="firmware-list" class="firmware-list" aria-label="Firmware change log"></section>
       </section>
+
+      <section id="beta-view" class="dashboard-view is-hidden" data-view-panel="beta">
+        <section class="quick-input-panel" aria-label="Quick beta test input">
+          <div>
+            <p class="eyebrow">Quick Beta Input</p>
+            <h2>Paste a test note, review the draft, then save it to Beta Test Progress.</h2>
+          </div>
+          <form id="beta-input-form" class="beta-input-form">
+            <label class="beta-raw-field">
+              Raw Input
+              <textarea id="beta-raw-input" rows="5" placeholder="Paste beta test notes, user test feedback, daily progress, or internal QA findings..."></textarea>
+            </label>
+            <div class="beta-input-grid">
+              <label>
+                Date
+                <input id="beta-input-date" type="date" />
+              </label>
+              <label>
+                Product Model
+                <input id="beta-input-model" placeholder="HA2, HD1, H1..." />
+              </label>
+              <label>
+                Version
+                <input id="beta-input-version" placeholder="V1.00.05.004" />
+              </label>
+              <label>
+                Test Type
+                <select id="beta-input-test-type">
+                  <option value="">-</option>
+                  <option>Firmware Beta</option>
+                  <option>APP Beta</option>
+                  <option>CPS Beta</option>
+                  <option>Hardware Test</option>
+                  <option>Regression Test</option>
+                </select>
+              </label>
+              <label>
+                Tester Type
+                <select id="beta-input-tester-type">
+                  <option value="">-</option>
+                  <option>Internal Test</option>
+                  <option>User Beta Test</option>
+                  <option>Engineer Test</option>
+                  <option>KOC Test</option>
+                </select>
+              </label>
+              <label>
+                Tester / Owner
+                <input id="beta-input-tester-owner" placeholder="Julia, user name, engineer..." />
+              </label>
+            </div>
+            <div id="beta-draft-fields" class="beta-draft-grid">
+              <label>
+                Issue Found
+                <textarea id="beta-input-issue-found" rows="2"></textarea>
+              </label>
+              <label>
+                Key Point
+                <textarea id="beta-input-key-point" rows="2"></textarea>
+              </label>
+              <label>
+                Severity
+                <select id="beta-input-severity">
+                  <option>Critical</option>
+                  <option>High</option>
+                  <option selected>Medium</option>
+                  <option>Low</option>
+                </select>
+              </label>
+              <label>
+                Priority
+                <select id="beta-input-priority">
+                  <option value="">-</option>
+                  <option>P0</option>
+                  <option>P1</option>
+                  <option selected>P2</option>
+                </select>
+              </label>
+              <label>
+                Status
+                <select id="beta-input-status">
+                  <option>Open</option>
+                  <option>Need Review</option>
+                  <option>Reproducing</option>
+                  <option>In Progress</option>
+                  <option>Resolved</option>
+                  <option>Closed</option>
+                </select>
+              </label>
+              <label>
+                Next Action
+                <textarea id="beta-input-next-action" rows="2"></textarea>
+              </label>
+            </div>
+            <div class="quick-input-actions">
+              <button id="beta-analyze-button" type="button">Analyze</button>
+              <button id="beta-save-button" type="submit">Save to Sheet</button>
+              <button id="beta-clear-button" type="button">Clear</button>
+            </div>
+            <p id="beta-input-message" class="state-message is-hidden"></p>
+          </form>
+        </section>
+
+        <section class="filter-bar beta-filter-bar" aria-label="Beta test filters">
+          <label>
+            Product Model
+            <select id="beta-model-filter">
+              <option value="all">All Models</option>
+            </select>
+          </label>
+          <label>
+            Version
+            <select id="beta-version-filter">
+              <option value="all">All Versions</option>
+            </select>
+          </label>
+          <label>
+            Tester Type
+            <select id="beta-tester-type-filter">
+              <option value="">All Tester Types</option>
+              <option>Internal Test</option>
+              <option>User Beta Test</option>
+              <option>Engineer Test</option>
+              <option>KOC Test</option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select id="beta-status-filter">
+              <option value="">All Statuses</option>
+              <option>Open</option>
+              <option>Need Review</option>
+              <option>Reproducing</option>
+              <option>In Progress</option>
+              <option>Resolved</option>
+              <option>Closed</option>
+            </select>
+          </label>
+          <label>
+            Priority
+            <select id="beta-priority-filter">
+              <option value="">All Priorities</option>
+              <option>P0</option>
+              <option>P1</option>
+              <option>P2</option>
+            </select>
+          </label>
+          <label class="search-field">
+            Keyword Search
+            <input id="beta-search-filter" placeholder="Search beta issues, owners, raw input..." />
+          </label>
+          <fieldset class="date-range-filter">
+            <legend>Date Range</legend>
+            <label>
+              From Date
+              <input id="beta-date-from-filter" type="date" />
+            </label>
+            <label>
+              To Date
+              <input id="beta-date-to-filter" type="date" />
+            </label>
+          </fieldset>
+          <button id="beta-refresh-button" type="button">Refresh</button>
+        </section>
+        <section id="beta-summary" class="beta-summary" aria-label="Beta test summary"></section>
+        <p id="beta-message" class="state-message is-hidden"></p>
+        <section id="beta-list" class="beta-list" aria-label="Beta test progress records"></section>
+      </section>
       <footer class="app-footer">
         © 2026 Julia. All rights reserved. This dashboard is a personal internal tool created for Julia's private workflow. It may not be copied, redistributed, commercialized, or used by any third party without permission.
       </footer>
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260613-linked-firmware-compact"></script>
+    <script type="module" src="./app.js?v=20260620-beta-keypoint"></script>
   </body>
 </html>

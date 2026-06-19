@@ -1,23 +1,32 @@
 import {
+  BETA_TEST_HEADERS,
   STATUS_LABELS,
   buildFirmwareLookup,
   categoryClass,
+  filterBetaTests,
   filterFeedback,
   filterFirmware,
+  inferBetaDraft,
   isFirmwareReleaseLikeFeedbackRow,
+  normalizeBetaRow,
   normalizeFirmwareRow,
   normalizeRequestNumber,
   normalizeRow,
   parseClosedRequests,
+  summaryPercentages,
+  summarizeBetaTests,
   summarizeFeedback,
   summarizeFirmware,
+  uniqueBetaModels,
+  uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260613-linked-firmware-fold";
+} from "./lib/domain.mjs?v=20260620-beta-keypoint";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
 const FIRMWARE_SHEET_NAME = "firmware change log";
+const BETA_SHEET_NAME = "Beta Test Progress";
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGan0BA3Zsl_EXw0gYkAYrgapvvt1k0oTQZB5uGXi8LqhQsp3KyfqrJv0qyGysL5UN/exec";
 const SHEET_HEADERS_BY_POSITION = [
   "Date",
@@ -41,14 +50,19 @@ const SHEET_HEADERS_BY_POSITION = [
   "Status Change Log",
 ];
 const FIRMWARE_REQUIRED_HEADERS = ["Date", "Model", "Firmware Version", "Change log", "更新日志", "关闭需求"];
+const BETA_REQUIRED_HEADERS = ["Date", "Product Model", "Version", "Issue Found", "Status", "Raw Input"];
 const EXPECTED_SHEET_HEADERS = new Set([
   ...SHEET_HEADERS_BY_POSITION,
   ...FIRMWARE_REQUIRED_HEADERS,
+  ...BETA_TEST_HEADERS,
 ]);
+const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
+const EDIT_ROLES = new Set(["Admin", "Editor"]);
 
 const state = {
   records: [],
   firmwareRecords: [],
+  betaRecords: [],
   firmwareLookup: new Map(),
   activeView: "feedback",
   summaryFilter: "",
@@ -67,12 +81,32 @@ const state = {
     dateFrom: "",
     dateTo: "",
   },
+  betaFilters: {
+    model: "all",
+    version: "all",
+    testerType: "",
+    status: "",
+    priority: "",
+    search: "",
+    dateFrom: "",
+    dateTo: "",
+  },
+  auth: null,
 };
 
 const elements = {
+  appShell: document.querySelector(".app-shell"),
+  loginScreen: document.querySelector("#login-screen"),
+  loginForm: document.querySelector("#login-form"),
+  loginUsername: document.querySelector("#login-username"),
+  loginPassword: document.querySelector("#login-password"),
+  loginMessage: document.querySelector("#login-message"),
+  authRole: document.querySelector("#auth-role"),
+  logout: document.querySelector("#logout-button"),
   viewTabs: document.querySelectorAll("[data-view]"),
   feedbackView: document.querySelector("#feedback-view"),
   firmwareView: document.querySelector("#firmware-view"),
+  betaView: document.querySelector("#beta-view"),
   model: document.querySelector("#model-filter"),
   search: document.querySelector("#search-filter"),
   category: document.querySelector("#category-filter"),
@@ -93,6 +127,36 @@ const elements = {
   firmwareSummary: document.querySelector("#firmware-summary"),
   firmwareMessage: document.querySelector("#firmware-message"),
   firmwareList: document.querySelector("#firmware-list"),
+  betaInputForm: document.querySelector("#beta-input-form"),
+  betaRawInput: document.querySelector("#beta-raw-input"),
+  betaInputDate: document.querySelector("#beta-input-date"),
+  betaInputModel: document.querySelector("#beta-input-model"),
+  betaInputVersion: document.querySelector("#beta-input-version"),
+  betaInputTestType: document.querySelector("#beta-input-test-type"),
+  betaInputTesterType: document.querySelector("#beta-input-tester-type"),
+  betaInputTesterOwner: document.querySelector("#beta-input-tester-owner"),
+  betaInputIssueFound: document.querySelector("#beta-input-issue-found"),
+  betaInputKeyPoint: document.querySelector("#beta-input-key-point"),
+  betaInputSeverity: document.querySelector("#beta-input-severity"),
+  betaInputPriority: document.querySelector("#beta-input-priority"),
+  betaInputStatus: document.querySelector("#beta-input-status"),
+  betaInputNextAction: document.querySelector("#beta-input-next-action"),
+  betaAnalyze: document.querySelector("#beta-analyze-button"),
+  betaSave: document.querySelector("#beta-save-button"),
+  betaClear: document.querySelector("#beta-clear-button"),
+  betaInputMessage: document.querySelector("#beta-input-message"),
+  betaModel: document.querySelector("#beta-model-filter"),
+  betaVersion: document.querySelector("#beta-version-filter"),
+  betaTesterType: document.querySelector("#beta-tester-type-filter"),
+  betaStatus: document.querySelector("#beta-status-filter"),
+  betaPriority: document.querySelector("#beta-priority-filter"),
+  betaSearch: document.querySelector("#beta-search-filter"),
+  betaDateFrom: document.querySelector("#beta-date-from-filter"),
+  betaDateTo: document.querySelector("#beta-date-to-filter"),
+  betaRefresh: document.querySelector("#beta-refresh-button"),
+  betaSummary: document.querySelector("#beta-summary"),
+  betaMessage: document.querySelector("#beta-message"),
+  betaList: document.querySelector("#beta-list"),
 };
 
 function escapeHtml(value) {
@@ -114,6 +178,91 @@ function setFirmwareMessage(text, isError = false) {
   elements.firmwareMessage.textContent = text;
   elements.firmwareMessage.classList.toggle("state-message--error", isError);
   elements.firmwareMessage.classList.toggle("is-hidden", !text);
+}
+
+function setBetaMessage(text, isError = false) {
+  elements.betaMessage.textContent = text;
+  elements.betaMessage.classList.toggle("state-message--error", isError);
+  elements.betaMessage.classList.toggle("is-hidden", !text);
+}
+
+function setBetaInputMessage(text, isError = false) {
+  elements.betaInputMessage.textContent = text;
+  elements.betaInputMessage.classList.toggle("state-message--error", isError);
+  elements.betaInputMessage.classList.toggle("is-hidden", !text);
+}
+
+function canEdit() {
+  return EDIT_ROLES.has(state.auth?.role);
+}
+
+function setLoginMessage(text, isError = false) {
+  elements.loginMessage.textContent = text;
+  elements.loginMessage.classList.toggle("state-message--error", isError);
+}
+
+function saveAuth(auth) {
+  state.auth = auth;
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+}
+
+function clearAuth() {
+  state.auth = null;
+  window.localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+function showLogin() {
+  elements.loginScreen.classList.remove("is-hidden");
+  elements.appShell.classList.add("is-hidden");
+}
+
+function showDashboard() {
+  elements.loginScreen.classList.add("is-hidden");
+  elements.appShell.classList.remove("is-hidden");
+  elements.authRole.textContent = `${state.auth?.role || "Viewer"} · ${state.auth?.username || ""}`;
+}
+
+async function credentialHash(username, password) {
+  if (!window.crypto?.subtle) {
+    throw new Error("This browser cannot securely prepare the login request.");
+  }
+  const text = `${String(username || "").trim().toLowerCase()}:${String(password || "")}`;
+  const bytes = new TextEncoder().encode(text);
+  const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function login(username, password) {
+  const passwordHash = await credentialHash(username, password);
+  const payload = await callGoogleAppsScript({
+    action: "login",
+    username: String(username || "").trim(),
+    passwordHash,
+  });
+  if (!payload?.ok || !payload?.token) {
+    throw new Error(payload?.message || "Login failed.");
+  }
+  return {
+    token: payload.token,
+    username: payload.username,
+    role: payload.role,
+    expiresAt: payload.expiresAt,
+  };
+}
+
+async function verifySession(auth) {
+  if (!auth?.token) return null;
+  const payload = await callGoogleAppsScript({
+    action: "session",
+    authToken: auth.token,
+  });
+  if (!payload?.ok) return null;
+  return {
+    token: auth.token,
+    username: payload.username,
+    role: payload.role,
+    expiresAt: payload.expiresAt,
+  };
 }
 
 function renderModelOptions() {
@@ -160,19 +309,40 @@ function renderFirmwareFilterOptions() {
   state.firmwareFilters.version = elements.firmwareVersion.value;
 }
 
+function renderBetaFilterOptions() {
+  const currentModel = elements.betaModel.value;
+  const currentVersion = elements.betaVersion.value;
+  const models = uniqueBetaModels(state.betaRecords);
+  const selectedModel = models.includes(currentModel) ? currentModel : "all";
+  const versions = uniqueBetaVersions(state.betaRecords, selectedModel);
+
+  elements.betaModel.innerHTML = `<option value="all">All Models</option>${models
+    .map((model) => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`)
+    .join("")}`;
+  elements.betaVersion.innerHTML = `<option value="all">All Versions</option>${versions
+    .map((version) => `<option value="${escapeHtml(version)}">${escapeHtml(version)}</option>`)
+    .join("")}`;
+
+  elements.betaModel.value = selectedModel;
+  elements.betaVersion.value = versions.includes(currentVersion) ? currentVersion : "all";
+  state.betaFilters.model = elements.betaModel.value;
+  state.betaFilters.version = elements.betaVersion.value;
+}
+
 function renderSummary(records) {
   const summary = summarizeFeedback(records);
+  const percentages = summaryPercentages(summary);
   const items = [
-    ["total", "Total", summary.total, "summary-total"],
-    ["todo", "To Submit", summary.statusCounts.todo, "summary-todo"],
-    ["submitted", "Submitted", summary.statusCounts.submitted, "summary-submitted"],
-    ["inProgress", "In Progress", summary.statusCounts.inProgress, "summary-progress"],
-    ["resolved", "Resolved", summary.statusCounts.resolved, "summary-resolved"],
-    ["unresolvedBug", "Unresolved BUG", summary.unresolvedBugs, "summary-bug"],
+    ["total", "Total", summary.total, "summary-total", ""],
+    ["todo", "To Submit", summary.statusCounts.todo, "summary-todo", percentages.todo],
+    ["submitted", "Submitted", summary.statusCounts.submitted, "summary-submitted", percentages.submitted],
+    ["inProgress", "In Progress", summary.statusCounts.inProgress, "summary-progress", percentages.inProgress],
+    ["resolved", "Resolved", summary.statusCounts.resolved, "summary-resolved", percentages.resolved],
+    ["unresolvedBug", "Unresolved BUG", summary.unresolvedBugs, "summary-bug", percentages.unresolvedBug],
   ];
   elements.summary.innerHTML = items
     .map(
-      ([key, label, value, className]) => `
+      ([key, label, value, className, percent]) => `
         <button
           class="${className}${state.summaryFilter === key ? " is-active" : ""}"
           type="button"
@@ -180,6 +350,7 @@ function renderSummary(records) {
           aria-pressed="${state.summaryFilter === key ? "true" : "false"}"
         >
           <span>${escapeHtml(label)}</span>
+          ${percent ? `<small class="summary-percent">${escapeHtml(percent)}</small>` : ""}
           <strong>${value}</strong>
         </button>
       `,
@@ -194,6 +365,28 @@ function renderFirmwareSummary(records) {
     <div><span>Models</span><strong>${summary.modelCount}</strong></div>
     <div><span>Closed Requests</span><strong>${summary.closedRequestCount}</strong></div>
   `;
+}
+
+function renderBetaSummary(records) {
+  const summary = summarizeBetaTests(records);
+  const items = [
+    ["Total Issues", summary.total, "beta-total"],
+    ["Open", summary.open, "beta-open"],
+    ["In Progress", summary.inProgress, "beta-progress"],
+    ["Resolved", summary.resolved, "beta-resolved"],
+    ["Critical / High", summary.highSeverity, "beta-high"],
+    ["User Test Issues", summary.userTestIssues, "beta-user"],
+  ];
+  elements.betaSummary.innerHTML = items
+    .map(
+      ([label, value, className]) => `
+        <div class="${className}">
+          <span>${escapeHtml(label)}</span>
+          <strong>${value}</strong>
+        </div>
+      `,
+    )
+    .join("");
 }
 
 function applySummaryFilter(records) {
@@ -263,11 +456,11 @@ function firmwareMatchPayload(release) {
   };
 }
 
-function syncFirmwareClosedRequests(release, closedRequests, editorCode) {
+function syncFirmwareClosedRequests(release, closedRequests) {
   return callGoogleAppsScript({
     action: "updateFirmwareClosedRequests",
     closedRequests,
-    editorCode: String(editorCode || "").trim(),
+    authToken: state.auth?.token || "",
     match: JSON.stringify(firmwareMatchPayload(release)),
   }).then((payload) => {
     if (payload?.ok) return payload;
@@ -325,19 +518,29 @@ function firmwareCardTemplate(release, index) {
         <div class="closed-requests">
           <div class="closed-requests-header">
             <h3>Closed Requests</h3>
-            <button class="edit-closed-requests" type="button" data-release-index="${index}">Edit</button>
+            ${
+              canEdit()
+                ? `<button class="edit-closed-requests" type="button" data-release-index="${index}">Edit</button>`
+                : ""
+            }
           </div>
           <div class="closed-request-list">${closedRequests}</div>
-          <form class="closed-request-editor is-hidden" data-release-index="${index}">
-            <label>
-              Closed request numbers
-              <textarea rows="3">${escapeHtml(release.closedRequestsRaw)}</textarea>
-            </label>
-            <div>
-              <button type="submit">Save</button>
-              <button type="button" class="cancel-closed-request-edit">Cancel</button>
-            </div>
-          </form>
+          ${
+            canEdit()
+              ? `
+                <form class="closed-request-editor is-hidden" data-release-index="${index}">
+                  <label>
+                    Closed request numbers
+                    <textarea rows="3">${escapeHtml(release.closedRequestsRaw)}</textarea>
+                  </label>
+                  <div>
+                    <button type="submit">Save</button>
+                    <button type="button" class="cancel-closed-request-edit">Cancel</button>
+                  </div>
+                </form>
+              `
+              : ""
+          }
         </div>
       </details>
     </article>
@@ -359,6 +562,114 @@ function renderFirmware() {
   elements.firmwareList.innerHTML = visible.length
     ? visible.map((release) => firmwareCardTemplate(release, state.firmwareRecords.indexOf(release))).join("")
     : "";
+}
+
+function betaSeverityClass(severity) {
+  const value = cleanText(severity).toLowerCase();
+  if (value === "critical") return "severity-critical";
+  if (value === "high") return "severity-high";
+  if (value === "medium") return "severity-medium";
+  if (value === "low") return "severity-low";
+  return "severity-unknown";
+}
+
+function betaRecordTemplate(record, index) {
+  const chips = [
+    record.severity ? `<span class="severity-pill ${betaSeverityClass(record.severity)}">${escapeHtml(record.severity)}</span>` : "",
+    record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : "",
+    record.status ? `<span class="status-pill">${escapeHtml(record.status)}</span>` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+  return `
+    <article class="beta-card" data-beta-index="${index}" role="button" tabindex="0">
+      <div>
+        <p>${escapeHtml(record.productModel || "-")}</p>
+        <h3>${escapeHtml(record.issueFound || record.rawInput || "No issue summary")}</h3>
+      </div>
+      <div class="beta-card-meta">
+        <span>${escapeHtml(record.version || "-")}</span>
+        <span>${escapeHtml(record.testType || "-")}</span>
+        <span>${escapeHtml(record.testerOwner || "-")}</span>
+      </div>
+      <div class="beta-card-chips">${chips}</div>
+      <p class="beta-next-action">${escapeHtml(record.nextAction || record.notes || "-")}</p>
+    </article>
+  `;
+}
+
+function openBetaDetail(record) {
+  document.body.classList.add("detail-open");
+  elements.detail.classList.remove("is-hidden");
+  elements.detail.innerHTML = `
+    <div class="detail-panel__header">
+      <div>
+        <div class="beta-card-chips">
+          ${record.severity ? `<span class="severity-pill ${betaSeverityClass(record.severity)}">${escapeHtml(record.severity)}</span>` : ""}
+          ${record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : ""}
+          ${record.status ? `<span class="status-pill">${escapeHtml(record.status)}</span>` : ""}
+        </div>
+        <h2>${escapeHtml(record.issueFound || "Beta test detail")}</h2>
+      </div>
+      <div class="detail-actions">
+        <button type="button" id="close-detail">Close</button>
+      </div>
+    </div>
+    <dl class="detail-list">
+      ${detailRow("Date", record.date)}
+      ${detailRow("Product Model", record.productModel)}
+      ${detailRow("Version", record.version)}
+      ${detailRow("Test Type", record.testType)}
+      ${detailRow("Tester Type", record.testerType)}
+      ${detailRow("Tester / Owner", record.testerOwner)}
+      ${detailRow("Issue Source", record.issueSource)}
+      ${detailRow("Test Item", record.testItem)}
+      ${detailRow("Issue Found", record.issueFound)}
+      ${detailRow("Key Point", record.keyPoint)}
+      ${detailRow("Severity", record.severity)}
+      ${detailRow("Priority", record.priority)}
+      ${detailRow("Status", record.status)}
+      ${detailRow("Assigned To", record.assignedTo)}
+      ${detailRow("Engineering Response", record.engineeringResponse)}
+      ${detailRow("Next Action", record.nextAction)}
+      ${detailRow("Target Date", record.targetDate)}
+      ${detailRow("Resolved Date", record.resolvedDate)}
+      ${detailRow("Related Request Number", record.relatedRequestNumber)}
+      ${detailRow("Related Firmware Version", record.relatedFirmwareVersion)}
+      ${detailRow("Notes", record.notes)}
+      ${detailRow("Raw Input", record.rawInput)}
+    </dl>
+  `;
+  document.querySelector("#close-detail").addEventListener("click", () => {
+    elements.detail.classList.add("is-hidden");
+    document.body.classList.remove("detail-open");
+  });
+}
+
+function renderBeta() {
+  const visible = filterBetaTests(state.betaRecords, state.betaFilters).sort((a, b) =>
+    String(b.date).localeCompare(String(a.date)),
+  );
+  renderBetaSummary(visible);
+  if (!state.betaRecords.length && !elements.betaMessage.textContent) {
+    setBetaMessage("No beta test records found.");
+  } else if (state.betaRecords.length && !visible.length) {
+    setBetaMessage("No beta test records match the selected filters.");
+  } else if (state.betaRecords.length) {
+    setBetaMessage("");
+  }
+  elements.betaList.innerHTML = visible.length
+    ? visible.map((record) => betaRecordTemplate(record, state.betaRecords.indexOf(record))).join("")
+    : "";
+
+  elements.betaList.querySelectorAll(".beta-card").forEach((card) => {
+    card.addEventListener("click", () => openBetaDetail(state.betaRecords[Number(card.dataset.betaIndex)]));
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openBetaDetail(state.betaRecords[Number(card.dataset.betaIndex)]);
+    });
+  });
 }
 
 function renderBoard(records) {
@@ -498,21 +809,22 @@ function callGoogleAppsScript(params) {
   });
 }
 
-async function verifyEditorCode(editorCode) {
+async function verifyEditPermission() {
   const payload = await callGoogleAppsScript({
     action: "ping",
-    editorCode: String(editorCode || "").trim(),
+    authToken: state.auth?.token || "",
   });
   if (!payload?.ok || !payload?.canEdit) {
-    throw new Error("Edit code was rejected by this dashboard endpoint.");
+    throw new Error("You do not have permission to edit.");
   }
 }
 
-function syncChangesToGoogleSheet(record, changes, editorCode) {
+function syncChangesToGoogleSheet(record, changes) {
   return callGoogleAppsScript({
+      action: "updateFeedbackFields",
       status: changes["Dashboard Status"] || "",
       changes: JSON.stringify(changes),
-      editorCode: String(editorCode || "").trim(),
+      authToken: state.auth?.token || "",
       match: JSON.stringify(recordMatchPayload(record)),
     }).then((payload) => {
       if (payload?.ok) return payload;
@@ -520,10 +832,115 @@ function syncChangesToGoogleSheet(record, changes, editorCode) {
     });
 }
 
-async function saveRecordChanges(record, changes, editorCode) {
+function betaPayloadFromInput() {
+  return {
+    Date: elements.betaInputDate.value.trim(),
+    "Product Model": elements.betaInputModel.value.trim(),
+    Version: elements.betaInputVersion.value.trim(),
+    "Test Type": elements.betaInputTestType.value.trim(),
+    "Tester Type": elements.betaInputTesterType.value.trim(),
+    "Tester / Owner": elements.betaInputTesterOwner.value.trim(),
+    "Issue Source": elements.betaInputTesterType.value.trim(),
+    "Test Item": "",
+    "Issue Found": elements.betaInputIssueFound.value.trim(),
+    "Key Point": elements.betaInputKeyPoint.value.trim(),
+    Severity: elements.betaInputSeverity.value.trim(),
+    Priority: elements.betaInputPriority.value.trim(),
+    Status: elements.betaInputStatus.value.trim(),
+    "Assigned To": "",
+    "Engineering Response": "",
+    "Next Action": elements.betaInputNextAction.value.trim(),
+    "Target Date": "",
+    "Resolved Date": "",
+    "Related Request Number": "",
+    "Related Firmware Version": elements.betaInputVersion.value.trim(),
+    Notes: "",
+    "Raw Input": elements.betaRawInput.value.trim(),
+  };
+}
+
+function syncBetaTestRecord(record) {
+  return callGoogleAppsScript({
+    action: "addBetaTestRecord",
+    authToken: state.auth?.token || "",
+    record: JSON.stringify(record),
+  }).then((payload) => {
+    if (payload?.ok) return payload;
+    throw new Error(payload?.message || "Save failed.");
+  });
+}
+
+function analyzeBetaInput() {
+  const rawInput = elements.betaRawInput.value.trim();
+  if (!rawInput) {
+    setBetaInputMessage("Paste beta test content first.", true);
+    return;
+  }
+  const draft = inferBetaDraft(rawInput);
+  if (!elements.betaInputDate.value) {
+    elements.betaInputDate.value = draft.date || new Date().toISOString().slice(0, 10);
+  }
+  if (!elements.betaInputTesterOwner.value.trim() && draft.testerOwner) {
+    elements.betaInputTesterOwner.value = draft.testerOwner;
+  }
+  elements.betaInputIssueFound.value = draft.issueFound;
+  elements.betaInputKeyPoint.value = draft.keyPoint;
+  elements.betaInputSeverity.value = draft.severity;
+  elements.betaInputPriority.value = draft.priority;
+  elements.betaInputStatus.value = draft.status;
+  elements.betaInputNextAction.value = draft.nextAction;
+  setBetaInputMessage("Draft generated. Review it, then save to Sheet.");
+}
+
+function clearBetaInput() {
+  elements.betaInputForm.reset();
+  elements.betaInputKeyPoint.value = "";
+  elements.betaInputPriority.value = "P2";
+  elements.betaInputSeverity.value = "Medium";
+  elements.betaInputStatus.value = "Open";
+  setBetaInputMessage("");
+}
+
+async function saveBetaInput() {
+  if (!canEdit()) {
+    setBetaInputMessage("You do not have permission to save records.", true);
+    return;
+  }
+  if (!elements.betaRawInput.value.trim()) {
+    setBetaInputMessage("Raw Input is required.", true);
+    return;
+  }
+  if (!elements.betaInputIssueFound.value.trim()) {
+    analyzeBetaInput();
+  }
+  const record = betaPayloadFromInput();
+  elements.betaSave.disabled = true;
+  elements.betaSave.textContent = "Saving...";
+  setBetaInputMessage("Saving beta test record...");
+  try {
+    await verifyEditPermission();
+    await syncBetaTestRecord(record);
+    state.betaRecords.unshift(normalizeBetaRow(record));
+    renderBetaFilterOptions();
+    renderBeta();
+    clearBetaInput();
+    setBetaInputMessage("Saved to Beta Test Progress.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Save failed.";
+    const friendlyMessage = message.includes("Missing feedback identity")
+      ? "Apps Script is still running the old version. Deploy the updated Apps Script, then try again."
+      : message;
+    setBetaInputMessage(friendlyMessage, true);
+  } finally {
+    elements.betaSave.disabled = false;
+    elements.betaSave.textContent = "Save to Sheet";
+  }
+}
+
+async function saveRecordChanges(record, changes) {
   showToast("Saving changes...");
   try {
-    const result = await syncChangesToGoogleSheet(record, changes, editorCode);
+    const result = await syncChangesToGoogleSheet(record, changes);
     applySavedChanges(record, changes, result);
     const filtered = filterFeedback(state.records, state.filters);
     renderSummary(filtered);
@@ -569,6 +986,10 @@ function detailRow(label, value) {
 
 function editableDetailRow(label, fieldHtml, size = "medium") {
   return `<div class="detail-editable-row detail-editable-row--${size}"><dt>${escapeHtml(label)}</dt><dd>${fieldHtml}</dd></div>`;
+}
+
+function permissionAwareDetailRow(label, value, fieldHtml, size = "medium") {
+  return canEdit() ? editableDetailRow(label, fieldHtml, size) : detailRow(label, value);
 }
 
 function statusSelectTemplate(record) {
@@ -766,23 +1187,27 @@ function openDetail(record) {
       ${detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
-      ${editableDetailRow("Status", statusSelectTemplate(record), "short")}
-      ${editableDetailRow("Priority", prioritySelectTemplate(record), "short")}
-      ${editableDetailRow("Request number", `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
-      ${editableDetailRow("ING", `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
-      ${editableDetailRow("DONE", doneSelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Status", STATUS_LABELS[record.status] || "-", statusSelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Priority", record.priority, prioritySelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Request number", record.requestNumber, `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
+      ${permissionAwareDetailRow("ING", record.ing, `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
+      ${permissionAwareDetailRow("DONE", record.done, doneSelectTemplate(record), "short")}
       ${modificationRowsTemplate(record)}
       ${detailRow("Upgrade requirements", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
-      ${editableDetailRow("Notes", `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
+      ${permissionAwareDetailRow("Notes", record.notes, `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
     </dl>
-    <button class="save-detail-changes" type="button">Save Changes</button>
+    ${canEdit() ? `<button class="save-detail-changes" type="button">Save Changes</button>` : ""}
   `;
   document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
     await copyEngineerSummary(record);
     showToast("Engineer summary copied");
   });
-  document.querySelector(".save-detail-changes").addEventListener("click", async () => {
+  document.querySelector(".save-detail-changes")?.addEventListener("click", async () => {
+    if (!canEdit()) {
+      showToast("You do not have permission to edit.");
+      return;
+    }
     const changes = changedFields(record);
     if (!Object.keys(changes).length) {
       showToast("No changes to save");
@@ -790,16 +1215,10 @@ function openDetail(record) {
     }
     const confirmed = window.confirm(`Confirm changes?\n\n${changesSummary(record, changes)}`);
     if (!confirmed) return;
-    const editorCode = window.prompt("Enter editor code to save changes:");
-    const cleanEditorCode = String(editorCode || "").trim();
-    if (!cleanEditorCode) {
-      showToast("Edit cancelled");
-      return;
-    }
     setDetailSaving(true);
     try {
-      await verifyEditorCode(cleanEditorCode);
-      await saveRecordChanges(record, changes, cleanEditorCode);
+      await verifyEditPermission();
+      await saveRecordChanges(record, changes);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Update failed");
     }
@@ -843,37 +1262,77 @@ function buildRecordsFromHeaders(tableRows, headers) {
     .map((row) => {
       const record = {};
       headers.forEach((header, index) => {
-        if (!header) return;
-        record[header] = sheetCellValue(row, index);
+        const canonicalHeader = canonicalSheetHeader(header);
+        if (!canonicalHeader) return;
+        record[canonicalHeader] = sheetCellValue(row, index);
       });
       return record;
     })
     .filter(hasAnyValue);
 }
 
+function normalizeSheetHeader(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+const CANONICAL_SHEET_HEADERS = new Map(
+  [...EXPECTED_SHEET_HEADERS].map((header) => [normalizeSheetHeader(header), header]),
+);
+
+function canonicalSheetHeader(value) {
+  const text = String(value || "").trim();
+  return CANONICAL_SHEET_HEADERS.get(normalizeSheetHeader(text)) || text;
+}
+
+function headerScore(headers) {
+  return headers.filter((header) => EXPECTED_SHEET_HEADERS.has(canonicalSheetHeader(header))).length;
+}
+
+function tableRowValues(row) {
+  return row?.c.map((_, index) => sheetCellValue(row, index)) || [];
+}
+
+function recordsFromDetectedHeaderRow(tableRows) {
+  const searchLimit = Math.min(tableRows.length, 40);
+  let bestIndex = -1;
+  let bestScore = 0;
+
+  for (let index = 0; index < searchLimit; index += 1) {
+    const values = tableRowValues(tableRows[index]);
+    const score = headerScore(values);
+    if (score > bestScore) {
+      bestIndex = index;
+      bestScore = score;
+    }
+  }
+
+  if (bestIndex >= 0 && bestScore >= 3) {
+    return buildRecordsFromHeaders(tableRows.slice(bestIndex + 1), tableRowValues(tableRows[bestIndex]));
+  }
+
+  return null;
+}
+
 function tableRowsToRecords(table) {
-  const labels = table.cols.map((column) => String(column.label || "").trim());
-  const ids = table.cols.map((column) => String(column.id || "").trim());
-  const labelsHaveExpectedHeaders = labels.some((label) => EXPECTED_SHEET_HEADERS.has(label));
+  const labels = table.cols.map((column) => canonicalSheetHeader(column.label));
+  const ids = table.cols.map((column) => canonicalSheetHeader(column.id));
+  const labelsHaveExpectedHeaders = headerScore(labels) > 0;
   const headers = labelsHaveExpectedHeaders ? labels : ids;
   const parsedRecords = buildRecordsFromHeaders(table.rows, headers);
 
-  if (headers.some((header) => EXPECTED_SHEET_HEADERS.has(header))) {
+  if (headerScore(headers) > 0) {
     return parsedRecords;
   }
 
-  const firstRowHeaders = table.rows[0]?.c.map((_, index) => sheetCellValue(table.rows[0], index)) || [];
-  const firstRowHasExpectedHeaders = firstRowHeaders.some((header) => EXPECTED_SHEET_HEADERS.has(header));
-  if (firstRowHasExpectedHeaders) {
-    return buildRecordsFromHeaders(table.rows.slice(1), firstRowHeaders);
+  const detectedHeaderRecords = recordsFromDetectedHeaderRow(table.rows);
+  if (detectedHeaderRecords) {
+    return detectedHeaderRecords;
   }
 
-  const idsLookLikeColumnLetters = ids.every((id) => /^[A-Z]+$/.test(id));
-  if (idsLookLikeColumnLetters) {
-    return buildRecordsFromHeaders(table.rows, SHEET_HEADERS_BY_POSITION);
-  }
-
-  return parsedRecords;
+  throw new Error("Sheet header row was not detected. Please keep the field names row visible in the first 40 rows.");
 }
 
 function loadSheetRows({ gid = "", sheetName = "" }) {
@@ -883,6 +1342,7 @@ function loadSheetRows({ gid = "", sheetName = "" }) {
     const query = new URLSearchParams({
       tq: "select *",
       tqx: `out:json;responseHandler:${callbackName}`,
+      headers: "1",
       cacheBust: String(Date.now()),
     });
     if (gid) query.set("gid", gid);
@@ -916,6 +1376,11 @@ function validateFirmwareRows(rows) {
   return FIRMWARE_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
 }
 
+function validateBetaRows(rows) {
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  return BETA_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
+}
+
 async function loadFirmwareRecords() {
   const rows = await loadSheetRows({ sheetName: FIRMWARE_SHEET_NAME });
   const missing = validateFirmwareRows(rows);
@@ -927,17 +1392,32 @@ async function loadFirmwareRecords() {
     .filter((release) => release.date || release.model || release.version || release.changeLog);
 }
 
+async function loadBetaRecords() {
+  const rows = await loadSheetRows({ sheetName: BETA_SHEET_NAME });
+  const missing = validateBetaRows(rows);
+  if (missing.length) {
+    throw new Error(`Beta Test Progress is missing columns: ${missing.join(", ")}`);
+  }
+  return rows
+    .map(normalizeBetaRow)
+    .filter((record) => record.date || record.productModel || record.issueFound || record.rawInput);
+}
+
 async function load() {
   setMessage("Loading feedback data...");
   setFirmwareMessage("Loading firmware data...");
+  setBetaMessage("Loading beta test data...");
   renderSummary([]);
   renderFirmwareSummary([]);
+  renderBetaSummary([]);
   elements.board.innerHTML = "";
   elements.firmwareList.innerHTML = "";
+  elements.betaList.innerHTML = "";
   try {
-    const [feedbackRows, firmwareResult] = await Promise.allSettled([
+    const [feedbackRows, firmwareResult, betaResult] = await Promise.allSettled([
       loadSheetRows({ gid: FEEDBACK_SHEET_GID }),
       loadFirmwareRecords(),
+      loadBetaRecords(),
     ]);
 
     if (feedbackRows.status !== "fulfilled") {
@@ -963,8 +1443,21 @@ async function load() {
       );
     }
 
+    if (betaResult.status === "fulfilled") {
+      state.betaRecords = betaResult.value;
+      renderBetaFilterOptions();
+      setBetaMessage("");
+    } else {
+      state.betaRecords = [];
+      setBetaMessage(
+        betaResult.reason instanceof Error ? betaResult.reason.message : "Beta Test Progress is not available yet.",
+        true,
+      );
+    }
+
     render();
     renderFirmware();
+    renderBeta();
   } catch (error) {
     setMessage(error instanceof Error ? error.message : "Unknown loading error", true);
   }
@@ -979,6 +1472,7 @@ function setActiveView(view) {
   });
   elements.feedbackView.classList.toggle("is-hidden", view !== "feedback");
   elements.firmwareView.classList.toggle("is-hidden", view !== "firmware");
+  elements.betaView.classList.toggle("is-hidden", view !== "beta");
 }
 
 elements.viewTabs.forEach((button) => {
@@ -1030,6 +1524,46 @@ elements.firmwareDateTo.addEventListener("change", () => {
   renderFirmware();
 });
 elements.firmwareRefresh.addEventListener("click", load);
+elements.betaModel.addEventListener("change", () => {
+  state.betaFilters.model = elements.betaModel.value;
+  renderBetaFilterOptions();
+  renderBeta();
+});
+elements.betaVersion.addEventListener("change", () => {
+  state.betaFilters.version = elements.betaVersion.value;
+  renderBeta();
+});
+elements.betaTesterType.addEventListener("change", () => {
+  state.betaFilters.testerType = elements.betaTesterType.value;
+  renderBeta();
+});
+elements.betaStatus.addEventListener("change", () => {
+  state.betaFilters.status = elements.betaStatus.value;
+  renderBeta();
+});
+elements.betaPriority.addEventListener("change", () => {
+  state.betaFilters.priority = elements.betaPriority.value;
+  renderBeta();
+});
+elements.betaSearch.addEventListener("input", () => {
+  state.betaFilters.search = elements.betaSearch.value;
+  renderBeta();
+});
+elements.betaDateFrom.addEventListener("change", () => {
+  state.betaFilters.dateFrom = elements.betaDateFrom.value;
+  renderBeta();
+});
+elements.betaDateTo.addEventListener("change", () => {
+  state.betaFilters.dateTo = elements.betaDateTo.value;
+  renderBeta();
+});
+elements.betaRefresh.addEventListener("click", load);
+elements.betaAnalyze.addEventListener("click", analyzeBetaInput);
+elements.betaClear.addEventListener("click", clearBetaInput);
+elements.betaInputForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveBetaInput();
+});
 elements.firmwareList.addEventListener("click", (event) => {
   const requestButton = event.target.closest(".closed-request-link");
   if (requestButton) {
@@ -1073,10 +1607,8 @@ elements.firmwareList.addEventListener("submit", async (event) => {
     return;
   }
 
-  const editorCode = window.prompt("Enter editor code to save changes:");
-  const cleanEditorCode = String(editorCode || "").trim();
-  if (!cleanEditorCode) {
-    showToast("Edit cancelled");
+  if (!canEdit()) {
+    showToast("You do not have permission to edit.");
     return;
   }
 
@@ -1089,8 +1621,8 @@ elements.firmwareList.addEventListener("submit", async (event) => {
   }
 
   try {
-    await verifyEditorCode(cleanEditorCode);
-    await syncFirmwareClosedRequests(release, nextValue, cleanEditorCode);
+    await verifyEditPermission();
+    await syncFirmwareClosedRequests(release, nextValue);
     release.closedRequestsRaw = nextValue;
     release.closedRequests = parseClosedRequests(nextValue);
     state.firmwareLookup = buildFirmwareLookup(state.firmwareRecords);
@@ -1114,4 +1646,77 @@ elements.summary.addEventListener("click", (event) => {
   render();
 });
 
-load();
+elements.loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const username = elements.loginUsername.value.trim();
+  const password = elements.loginPassword.value;
+  if (!username || !password) {
+    setLoginMessage("Enter account and password.", true);
+    return;
+  }
+
+  const submitButton = elements.loginForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  submitButton.textContent = "Signing in...";
+  setLoginMessage("");
+
+  try {
+    const auth = await login(username, password);
+    saveAuth(auth);
+    elements.loginPassword.value = "";
+    showDashboard();
+    await load();
+  } catch (error) {
+    clearAuth();
+    showLogin();
+    setLoginMessage(error instanceof Error ? error.message : "Login failed.", true);
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "Sign in";
+  }
+});
+
+elements.logout.addEventListener("click", async () => {
+  if (state.auth?.token) {
+    callGoogleAppsScript({ action: "logout", authToken: state.auth.token }).catch(() => {});
+  }
+  clearAuth();
+  elements.board.innerHTML = "";
+  elements.firmwareList.innerHTML = "";
+  elements.betaList.innerHTML = "";
+  renderSummary([]);
+  renderFirmwareSummary([]);
+  renderBetaSummary([]);
+  showLogin();
+});
+
+async function initAuth() {
+  showLogin();
+  let saved = null;
+  try {
+    saved = JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) || "null");
+  } catch {
+    clearAuth();
+  }
+  if (!saved?.token) return;
+
+  setLoginMessage("Checking saved session...");
+  try {
+    const auth = await verifySession(saved);
+    if (!auth) {
+      clearAuth();
+      setLoginMessage("");
+      return;
+    }
+    saveAuth(auth);
+    setLoginMessage("");
+    showDashboard();
+    await load();
+  } catch {
+    clearAuth();
+    setLoginMessage("");
+    showLogin();
+  }
+}
+
+initAuth();
