@@ -21,7 +21,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260618-beta-input";
+} from "./lib/domain.mjs?v=20260620-beta-keypoint";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -136,6 +136,7 @@ const elements = {
   betaInputTesterType: document.querySelector("#beta-input-tester-type"),
   betaInputTesterOwner: document.querySelector("#beta-input-tester-owner"),
   betaInputIssueFound: document.querySelector("#beta-input-issue-found"),
+  betaInputKeyPoint: document.querySelector("#beta-input-key-point"),
   betaInputSeverity: document.querySelector("#beta-input-severity"),
   betaInputPriority: document.querySelector("#beta-input-priority"),
   betaInputStatus: document.querySelector("#beta-input-status"),
@@ -624,6 +625,7 @@ function openBetaDetail(record) {
       ${detailRow("Issue Source", record.issueSource)}
       ${detailRow("Test Item", record.testItem)}
       ${detailRow("Issue Found", record.issueFound)}
+      ${detailRow("Key Point", record.keyPoint)}
       ${detailRow("Severity", record.severity)}
       ${detailRow("Priority", record.priority)}
       ${detailRow("Status", record.status)}
@@ -841,6 +843,7 @@ function betaPayloadFromInput() {
     "Issue Source": elements.betaInputTesterType.value.trim(),
     "Test Item": "",
     "Issue Found": elements.betaInputIssueFound.value.trim(),
+    "Key Point": elements.betaInputKeyPoint.value.trim(),
     Severity: elements.betaInputSeverity.value.trim(),
     Priority: elements.betaInputPriority.value.trim(),
     Status: elements.betaInputStatus.value.trim(),
@@ -875,9 +878,13 @@ function analyzeBetaInput() {
   }
   const draft = inferBetaDraft(rawInput);
   if (!elements.betaInputDate.value) {
-    elements.betaInputDate.value = new Date().toISOString().slice(0, 10);
+    elements.betaInputDate.value = draft.date || new Date().toISOString().slice(0, 10);
+  }
+  if (!elements.betaInputTesterOwner.value.trim() && draft.testerOwner) {
+    elements.betaInputTesterOwner.value = draft.testerOwner;
   }
   elements.betaInputIssueFound.value = draft.issueFound;
+  elements.betaInputKeyPoint.value = draft.keyPoint;
   elements.betaInputSeverity.value = draft.severity;
   elements.betaInputPriority.value = draft.priority;
   elements.betaInputStatus.value = draft.status;
@@ -887,6 +894,7 @@ function analyzeBetaInput() {
 
 function clearBetaInput() {
   elements.betaInputForm.reset();
+  elements.betaInputKeyPoint.value = "";
   elements.betaInputPriority.value = "P2";
   elements.betaInputSeverity.value = "Medium";
   elements.betaInputStatus.value = "Open";
@@ -918,7 +926,11 @@ async function saveBetaInput() {
     clearBetaInput();
     setBetaInputMessage("Saved to Beta Test Progress.");
   } catch (error) {
-    setBetaInputMessage(error instanceof Error ? error.message : "Save failed.", true);
+    const message = error instanceof Error ? error.message : "Save failed.";
+    const friendlyMessage = message.includes("Missing feedback identity")
+      ? "Apps Script is still running the old version. Deploy the updated Apps Script, then try again."
+      : message;
+    setBetaInputMessage(friendlyMessage, true);
   } finally {
     elements.betaSave.disabled = false;
     elements.betaSave.textContent = "Save to Sheet";

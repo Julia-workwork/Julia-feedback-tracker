@@ -32,6 +32,7 @@ export const BETA_TEST_HEADERS = [
   "Issue Source",
   "Test Item",
   "Issue Found",
+  "Key Point",
   "Severity",
   "Priority",
   "Status",
@@ -154,6 +155,7 @@ export function normalizeBetaRow(row) {
     issueSource: clean(row["Issue Source"]),
     testItem: clean(row["Test Item"]),
     issueFound: clean(row["Issue Found"]),
+    keyPoint: clean(row["Key Point"]),
     severity: clean(row.Severity),
     priority: clean(row.Priority),
     status: clean(row.Status),
@@ -538,10 +540,114 @@ function firstMeaningfulLine(text) {
   );
 }
 
+function formatInputDate(year, month, day) {
+  const normalizedYear = year.length === 2 ? `20${year}` : year;
+  return `${normalizedYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function normalizeDateMatch(match) {
+  if (!match) return "";
+  return formatInputDate(match[1], match[2], match[3]);
+}
+
+function dateLinePattern() {
+  return /^(?:date\s*[:：]\s*)?(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s*$/i;
+}
+
+function dateAnywherePattern() {
+  return /(\d{4})[/-](\d{1,2})[/-](\d{1,2})/;
+}
+
+function isLikelyPersonName(value) {
+  const text = clean(value);
+  if (!text || text.length > 60) return false;
+  if (/[：:，,.;!?]/.test(text)) return false;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length < 2 || words.length > 4) return false;
+  return words.every((word) => /^[A-Z][A-Za-z'’-]+$/.test(word));
+}
+
+function parseInputLead(input) {
+  const lines = clean(input)
+    .split(/\n+/)
+    .map((line) => clean(line))
+    .filter(Boolean);
+  let date = "";
+  let testerOwner = "";
+  const issueLines = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const testerField = line.match(/^(?:tester|owner|user|from)\s*[:：]\s*(.+)$/i);
+    if (testerField) {
+      testerOwner ||= clean(testerField[1]);
+      continue;
+    }
+
+    const dateField = line.match(dateLinePattern());
+    if (dateField) {
+      date ||= normalizeDateMatch(dateField);
+      continue;
+    }
+
+    const leadDate = line.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(.+)$/);
+    if (leadDate) {
+      date ||= normalizeDateMatch(leadDate);
+      const rest = clean(leadDate[4]);
+      if (isLikelyPersonName(rest) && index === 0 && lines.length > 1) {
+        testerOwner ||= rest;
+        continue;
+      }
+      issueLines.push(rest);
+      continue;
+    }
+
+    const inlineDate = line.match(dateAnywherePattern());
+    if (inlineDate && !date) {
+      date = normalizeDateMatch(inlineDate);
+    }
+
+    if (!testerOwner && isLikelyPersonName(line)) {
+      const isSignature = index === lines.length - 1 || dateLinePattern().test(lines[index + 1] || "");
+      if (isSignature) {
+        testerOwner = line;
+        continue;
+      }
+    }
+
+    issueLines.push(line);
+  }
+
+  return {
+    issueFound: issueLines.join("\n") || firstMeaningfulLine(input),
+    date,
+    testerOwner,
+  };
+}
+
+function inferKeyPoint(issueFound) {
+  const text = clean(issueFound);
+  if (!text) return "";
+  if (/lost.*usps|usps.*lost|package.*lost|lost.*package/i.test(text)) {
+    return "Package appears lost in USPS system and may arrive very late.";
+  }
+  if (/(crash|reboot|freeze|卡死|死机|重启)/i.test(text)) {
+    return "Stability issue during testing; confirm reproduction steps and affected version.";
+  }
+  if (/(no audio|weak audio|microphone|modulation|没有声音|调制|麦克风)/i.test(text)) {
+    return "Audio or modulation issue; verify microphone gain, TX audio path, and firmware version.";
+  }
+  if (/(aprs|gnss|packet|位置|定位)/i.test(text)) {
+    return "APRS/GNSS behavior needs validation against expected firmware settings.";
+  }
+  return text.split(/\n+/).map((line) => clean(line)).find(Boolean) || "";
+}
+
 export function inferBetaDraft(input) {
   const rawInput = clean(input);
   const lower = rawInput.toLowerCase();
-  const issueFound = firstMeaningfulLine(rawInput);
+  const parsedInput = parseInputLead(rawInput);
+  const issueFound = parsedInput.issueFound;
   let severity = "Medium";
   if (/(crash|reboot|brick|cannot power|dead|freeze|卡死|死机|重启|无法开机|变砖)/i.test(rawInput)) {
     severity = "Critical";
@@ -560,6 +666,9 @@ export function inferBetaDraft(input) {
 
   return {
     issueFound,
+    keyPoint: inferKeyPoint(issueFound),
+    date: parsedInput.date,
+    testerOwner: parsedInput.testerOwner,
     severity,
     priority,
     status,
