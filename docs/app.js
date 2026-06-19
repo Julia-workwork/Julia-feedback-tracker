@@ -21,7 +21,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-beta-header-detect";
+} from "./lib/domain.mjs?v=20260620-empty-beta-ok";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -1376,11 +1376,13 @@ function loadSheetRows({ gid = "", sheetName = "", requiredHeaders = [] }) {
 }
 
 function validateFirmwareRows(rows) {
+  if (!rows.length) return [];
   const headers = rows.length ? Object.keys(rows[0]) : [];
   return FIRMWARE_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
 }
 
 function validateBetaRows(rows) {
+  if (!rows.length) return [];
   const headers = rows.length ? Object.keys(rows[0]) : [];
   return BETA_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
 }
