@@ -21,7 +21,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-beta-keypoint";
+} from "./lib/domain.mjs?v=20260620-beta-header-detect";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -1316,14 +1316,18 @@ function recordsFromDetectedHeaderRow(tableRows) {
   return null;
 }
 
-function tableRowsToRecords(table) {
+function hasRequiredHeaders(headers, requiredHeaders) {
+  return requiredHeaders.every((header) => headers.includes(header));
+}
+
+function tableRowsToRecords(table, requiredHeaders = []) {
   const labels = table.cols.map((column) => canonicalSheetHeader(column.label));
   const ids = table.cols.map((column) => canonicalSheetHeader(column.id));
   const labelsHaveExpectedHeaders = headerScore(labels) > 0;
   const headers = labelsHaveExpectedHeaders ? labels : ids;
   const parsedRecords = buildRecordsFromHeaders(table.rows, headers);
 
-  if (headerScore(headers) > 0) {
+  if (headerScore(headers) > 0 && hasRequiredHeaders(headers, requiredHeaders)) {
     return parsedRecords;
   }
 
@@ -1335,7 +1339,7 @@ function tableRowsToRecords(table) {
   throw new Error("Sheet header row was not detected. Please keep the field names row visible in the first 40 rows.");
 }
 
-function loadSheetRows({ gid = "", sheetName = "" }) {
+function loadSheetRows({ gid = "", sheetName = "", requiredHeaders = [] }) {
   return new Promise((resolve, reject) => {
     const callbackName = `handleSheet_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
@@ -1358,7 +1362,7 @@ function loadSheetRows({ gid = "", sheetName = "" }) {
         return;
       }
 
-      resolve(tableRowsToRecords(payload.table));
+      resolve(tableRowsToRecords(payload.table, requiredHeaders));
     };
 
     script.addEventListener("error", () => {
@@ -1382,7 +1386,7 @@ function validateBetaRows(rows) {
 }
 
 async function loadFirmwareRecords() {
-  const rows = await loadSheetRows({ sheetName: FIRMWARE_SHEET_NAME });
+  const rows = await loadSheetRows({ sheetName: FIRMWARE_SHEET_NAME, requiredHeaders: FIRMWARE_REQUIRED_HEADERS });
   const missing = validateFirmwareRows(rows);
   if (missing.length) {
     throw new Error(`Firmware Change Log is missing columns: ${missing.join(", ")}`);
@@ -1393,7 +1397,7 @@ async function loadFirmwareRecords() {
 }
 
 async function loadBetaRecords() {
-  const rows = await loadSheetRows({ sheetName: BETA_SHEET_NAME });
+  const rows = await loadSheetRows({ sheetName: BETA_SHEET_NAME, requiredHeaders: BETA_REQUIRED_HEADERS });
   const missing = validateBetaRows(rows);
   if (missing.length) {
     throw new Error(`Beta Test Progress is missing columns: ${missing.join(", ")}`);
