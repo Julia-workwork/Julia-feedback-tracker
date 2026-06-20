@@ -88,6 +88,9 @@
             </label>
           </fieldset>
           <button id="refresh-button" type="button">Refresh</button>
+        </section>
+
+        <section class="feedback-action-bar" aria-label="Feedback actions">
           <button id="feedback-add-button" class="add-record-button" type="button" hidden>+ Add Feedback</button>
         </section>
 
@@ -101,6 +104,10 @@
             <button id="feedback-close-button" class="quick-input-toggle" type="button">Close input</button>
           </div>
           <form id="feedback-input-form" class="beta-input-form feedback-input-form">
+            <label class="beta-raw-field feedback-wide-field">
+              Raw Input
+              <textarea id="feedback-raw-input" rows="5" placeholder="Paste user original words, date, model, channel, user name, or other scattered info..."></textarea>
+            </label>
             <div class="beta-input-grid">
               <label>
                 Date
@@ -166,6 +173,7 @@
               </label>
             </div>
             <div class="quick-input-actions">
+              <button id="feedback-analyze-button" type="button">Analyze</button>
               <button id="feedback-save-button" type="submit">Save to Sheet</button>
               <button id="feedback-clear-button" type="button">Clear</button>
             </div>
@@ -395,6 +403,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260620-feedback-add"></script>
+    <script type="module" src="./app.js?v=20260620-feedback-raw-input"></script>
   </body>
 </html>

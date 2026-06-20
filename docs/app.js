@@ -23,7 +23,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-feedback-add";
+} from "./lib/domain.mjs?v=20260620-feedback-raw-input";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -140,6 +140,7 @@ const elements = {
   feedbackClose: document.querySelector("#feedback-close-button"),
   feedbackInputPanel: document.querySelector("#feedback-input-panel"),
   feedbackInputForm: document.querySelector("#feedback-input-form"),
+  feedbackRawInput: document.querySelector("#feedback-raw-input"),
   feedbackInputDate: document.querySelector("#feedback-input-date"),
   feedbackInputModel: document.querySelector("#feedback-input-model"),
   feedbackInputId: document.querySelector("#feedback-input-id"),
@@ -153,6 +154,7 @@ const elements = {
   feedbackInputUpgrade: document.querySelector("#feedback-input-upgrade"),
   feedbackInputChinese: document.querySelector("#feedback-input-chinese"),
   feedbackInputNotes: document.querySelector("#feedback-input-notes"),
+  feedbackAnalyze: document.querySelector("#feedback-analyze-button"),
   feedbackSave: document.querySelector("#feedback-save-button"),
   feedbackClear: document.querySelector("#feedback-clear-button"),
   feedbackInputMessage: document.querySelector("#feedback-input-message"),
@@ -1022,6 +1024,180 @@ function feedbackPayloadFromInput() {
   };
 }
 
+function feedbackInputDateFromMatch(match) {
+  if (!match) return "";
+  const year = match[1].length === 2 ? `20${match[1]}` : match[1];
+  return `${year}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
+}
+
+function likelyFeedbackName(value) {
+  const text = String(value || "").trim();
+  if (!text || text.length > 60 || /[：:，,.;!?]/.test(text)) return false;
+  const words = text.split(/\s+/).filter(Boolean);
+  return words.length >= 2 && words.length <= 4 && words.every((word) => /^[A-Z][A-Za-z'’-]+$/.test(word));
+}
+
+function extractFeedbackModels(text) {
+  const knownModels = ["EZTALK65", "RA89R", "HA1UV", "HA1G", "HA2", "HD1", "HD2", "MA1", "M17", "H1", "A3"];
+  const nonModels = new Set(["APP", "CPS", "PTT", "QRP", "SDR", "DMR", "APRS", "GNSS", "USPS"]);
+  const seen = new Set();
+  const models = [];
+  const addModel = (value) => {
+    const model = String(value || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+    if (!model || seen.has(model) || nonModels.has(model) || /^V\d/i.test(model)) return;
+    if (knownModels.includes(model) || /^[A-Z]{1,8}\d[A-Z0-9-]*$/.test(model)) {
+      seen.add(model);
+      models.push(model);
+    }
+  };
+
+  const matches = String(text || "").match(/[A-Z]+[A-Z0-9]*(?:\/[A-Z0-9]+)?(?:-[A-Z0-9]+)?/gi) || [];
+  for (const match of matches) {
+    const slash = match.match(/^([A-Z]+\d+[A-Z0-9]*?)\/([A-Z][A-Z0-9]*)$/i);
+    if (slash) {
+      addModel(slash[1]);
+      const prefix = slash[1].match(/^([A-Z]+\d+)/i)?.[1] || "";
+      addModel(`${prefix}${slash[2]}`);
+      continue;
+    }
+    addModel(match);
+  }
+  return models;
+}
+
+function inferFeedbackCategory(text) {
+  if (/(love|great|good|excellent|thanks|喜欢|很好|不错)/i.test(text)) return "Positive review";
+  if (/(horrible|garbage|bad|waste|terrible|差|糟糕)/i.test(text)) return "Negative review";
+  if (/(crash|freeze|reboot|fail|cannot|doesn.?t work|no audio|weak|bug|issue|problem|无法|不能|失败|问题|卡死|重启)/i.test(text)) {
+    return "BUG";
+  }
+  if (/(add|need|want|wish|request|option|support|bring back|希望|增加|支持|功能)/i.test(text)) return "Feature Request";
+  if (/(improve|optimi[sz]e|better|enhance|优化|改进)/i.test(text)) return "Feature Enhancement";
+  return "";
+}
+
+function inferFeedbackPriority(text, category) {
+  if (/(brick|dead|cannot power|crash|reboot|no tx|no rx|no audio|无法开机|变砖|不能发射|不能接收)/i.test(text)) return "P1";
+  if (category === "BUG") return "P2";
+  return "P2";
+}
+
+function inferFeedbackKeyPoint(text, category) {
+  const clean = String(text || "").trim();
+  if (!clean) return "";
+  if (/(weak.*modulation|modulation.*weak|microphone|mic gain|麦克风|调制)/i.test(clean)) {
+    return "Weak TX modulation or microphone audio needs engineering verification.";
+  }
+  if (/(aprs|gnss|packet|位置|定位)/i.test(clean)) {
+    return "APRS/GNSS behavior or settings need validation against expected firmware behavior.";
+  }
+  if (/(usps|package|shipping|lost in.*system|物流|包裹)/i.test(clean)) {
+    return "User reports package/shipping issue; confirm whether this belongs to support follow-up.";
+  }
+  if (/(6m|six meter|50mhz|50 mhz)/i.test(clean)) {
+    return "User requests better 6m amateur radio equipment or antenna support.";
+  }
+  if (category === "Positive review") return "Positive product feedback; no engineering action unless paired with a request.";
+  if (category === "Negative review") return "Negative product feedback; identify concrete receiver, audio, or usability issue before engineering follow-up.";
+  return clean.split(/\n+/).map((line) => line.trim()).find(Boolean) || "";
+}
+
+function inferFeedbackDraft(input) {
+  const raw = String(input || "").trim();
+  const lines = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const issueLines = [];
+  let date = "";
+  let userId = "";
+  let email = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+  let requestNumber = raw.match(/rt\s*[\d-]+/i)?.[0]?.replace(/\s+/g, "").toUpperCase() || "";
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const fieldMatch = line.match(/^(?:user|from|name|tester|owner|id)\s*[:：]\s*(.+)$/i);
+    if (fieldMatch) {
+      userId ||= fieldMatch[1].trim();
+      continue;
+    }
+
+    const standaloneDate = line.match(/^(?:date\s*[:：]\s*)?(\d{4}|\d{2})[/-](\d{1,2})[/-](\d{1,2})$/i);
+    if (standaloneDate) {
+      date ||= feedbackInputDateFromMatch(standaloneDate);
+      continue;
+    }
+
+    const leadDate = line.match(/^(\d{4}|\d{2})[/-](\d{1,2})[/-](\d{1,2})\s+(.+)$/);
+    if (leadDate) {
+      date ||= feedbackInputDateFromMatch(leadDate);
+      let rest = leadDate[4].trim();
+      const namePrefix = rest.match(/^([A-Z][A-Za-z'’-]+(?:\s+[A-Z][A-Za-z'’-]+){1,3})(?:\s+(.+))?$/);
+      if (namePrefix && likelyFeedbackName(namePrefix[1])) {
+        userId ||= namePrefix[1];
+        rest = (namePrefix[2] || "").trim();
+      }
+      if (rest) issueLines.push(rest);
+      continue;
+    }
+
+    const inlineDate = line.match(/(\d{4}|\d{2})[/-](\d{1,2})[/-](\d{1,2})/);
+    if (inlineDate && !date) date = feedbackInputDateFromMatch(inlineDate);
+
+    if (!userId && likelyFeedbackName(line) && (index === lines.length - 1 || lines.length > 1)) {
+      userId = line;
+      continue;
+    }
+
+    if (line === email || line === requestNumber) continue;
+    issueLines.push(line);
+  }
+
+  const originalFeedback = issueLines.join("\n").trim() || raw;
+  const models = extractFeedbackModels(raw);
+  const channel = /whatsapp/i.test(raw)
+    ? "WhatsApp"
+    : /facebook|fb/i.test(raw)
+      ? "Facebook"
+      : /email|@/i.test(raw)
+        ? "Email"
+        : "";
+  const category = inferFeedbackCategory(originalFeedback);
+  return {
+    date,
+    model: models.join(", "),
+    userId,
+    email,
+    requestNumber,
+    channel,
+    category,
+    priority: inferFeedbackPriority(originalFeedback, category),
+    keyPoints: inferFeedbackKeyPoint(originalFeedback, category),
+    originalFeedback,
+  };
+}
+
+function analyzeFeedbackInput() {
+  if (!isAdmin()) {
+    showToast("Only Admin can analyze feedback input.");
+    return;
+  }
+  const rawInput = elements.feedbackRawInput.value.trim();
+  if (!rawInput) {
+    setFeedbackInputMessage("Paste Raw Input first.", true);
+    return;
+  }
+  const draft = inferFeedbackDraft(rawInput);
+  if (draft.date) elements.feedbackInputDate.value = draft.date;
+  if (draft.model && !elements.feedbackInputModel.value.trim()) elements.feedbackInputModel.value = draft.model;
+  if (draft.userId && !elements.feedbackInputId.value.trim()) elements.feedbackInputId.value = draft.userId;
+  if (draft.email && !elements.feedbackInputEmail.value.trim()) elements.feedbackInputEmail.value = draft.email;
+  if (draft.category && !elements.feedbackInputCategory.value.trim()) elements.feedbackInputCategory.value = draft.category;
+  if (draft.priority) elements.feedbackInputPriority.value = draft.priority;
+  if (draft.requestNumber && !elements.feedbackInputRequest.value.trim()) elements.feedbackInputRequest.value = draft.requestNumber;
+  if (draft.channel && !elements.feedbackInputChannel.value.trim()) elements.feedbackInputChannel.value = draft.channel;
+  if (draft.keyPoints && !elements.feedbackInputKeyPoints.value.trim()) elements.feedbackInputKeyPoints.value = draft.keyPoints;
+  elements.feedbackInputUpgrade.value = draft.originalFeedback;
+  setFeedbackInputMessage("Draft generated. Original Feedback keeps the user's original words.");
+}
+
 function syncFeedbackRecord(record) {
   return callGoogleAppsScript({
     action: "addFeedbackRecord",
@@ -1881,6 +2057,7 @@ elements.feedbackAdd.addEventListener("click", () => {
   toggleFeedbackInput(isClosed);
 });
 elements.feedbackClose.addEventListener("click", () => toggleFeedbackInput(false));
+elements.feedbackAnalyze.addEventListener("click", analyzeFeedbackInput);
 elements.feedbackClear.addEventListener("click", clearFeedbackInput);
 elements.feedbackInputForm.addEventListener("submit", async (event) => {
   event.preventDefault();
