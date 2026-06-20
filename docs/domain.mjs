@@ -132,16 +132,16 @@ export function parseClosedRequests(input) {
 
 export function normalizeFirmwareRow(row) {
   return {
-    date: clean(row.Date),
-    model: clean(row.Model),
-    hardwareVersion: clean(row["Hardware version"]),
-    version: clean(row["Firmware Version"] || row.Verion || row.Version),
-    versionStatus: clean(row["版本状态"]),
-    reasonForChange: clean(row["Reason for Change"]),
-    changeLog: clean(row["Change log"]),
-    chineseLog: clean(row["更新日志"]),
-    closedRequestsRaw: clean(row["关闭需求"]),
-    closedRequests: parseClosedRequests(row["关闭需求"]),
+    date: clean(row.Date || row.A || row[""]),
+    model: clean(row.Model || row.B),
+    hardwareVersion: clean(row["Hardware version"] || row.C),
+    version: clean(row["Firmware Version"] || row.Verion || row.Version || row.D),
+    versionStatus: clean(row["版本状态"] || row.E),
+    reasonForChange: clean(row["Reason for Change"] || row.F),
+    changeLog: clean(row["Change log"] || row.G),
+    chineseLog: clean(row["更新日志"] || row.H),
+    closedRequestsRaw: clean(row["关闭需求"] || row.I),
+    closedRequests: parseClosedRequests(row["关闭需求"] || row.I),
   };
 }
 

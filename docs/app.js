@@ -60,6 +60,23 @@ const EXPECTED_SHEET_HEADERS = new Set([
 ]);
 const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
 const EDIT_ROLES = new Set(["Admin", "Editor"]);
+const HERO_COPY = {
+  feedback: {
+    eyebrow: "Julia's Feedback Tracker",
+    title: "Engineering Follow-up Dashboard",
+    note: "Private internal tool owned by Julia. Personal workflow only.",
+  },
+  firmware: {
+    eyebrow: "Firmware Release Tracker",
+    title: "Firmware Change Log",
+    note: "Track firmware versions, release notes, and closed requests.",
+  },
+  beta: {
+    eyebrow: "Beta Test Progress",
+    title: "Beta Test Control Room",
+    note: "Record test issues, follow-up actions, and validation progress.",
+  },
+};
 
 const state = {
   records: [],
@@ -109,6 +126,9 @@ const elements = {
   feedbackView: document.querySelector("#feedback-view"),
   firmwareView: document.querySelector("#firmware-view"),
   betaView: document.querySelector("#beta-view"),
+  heroEyebrow: document.querySelector("#hero-eyebrow"),
+  heroTitle: document.querySelector("#hero-title"),
+  heroNote: document.querySelector("#hero-note"),
   model: document.querySelector("#model-filter"),
   search: document.querySelector("#search-filter"),
   category: document.querySelector("#category-filter"),
@@ -1569,13 +1589,14 @@ function validateBetaRows(rows) {
 
 async function loadFirmwareRecords() {
   const rows = await loadSheetRows({ sheetName: FIRMWARE_SHEET_NAME, requiredHeaders: FIRMWARE_REQUIRED_HEADERS });
-  const missing = validateFirmwareRows(rows);
-  if (missing.length) {
-    throw new Error(`Firmware Change Log is missing columns: ${missing.join(", ")}`);
-  }
-  return rows
+  const releases = rows
     .map(normalizeFirmwareRow)
     .filter((release) => release.date || release.model || release.version || release.changeLog);
+  const missing = validateFirmwareRows(rows);
+  if (missing.length && !releases.length) {
+    throw new Error(`Firmware Change Log is missing columns: ${missing.join(", ")}`);
+  }
+  return releases;
 }
 
 async function loadBetaRecords() {
@@ -1655,6 +1676,10 @@ async function load() {
 
 function setActiveView(view) {
   state.activeView = view;
+  const hero = HERO_COPY[view] || HERO_COPY.feedback;
+  elements.heroEyebrow.textContent = hero.eyebrow;
+  elements.heroTitle.textContent = hero.title;
+  elements.heroNote.textContent = hero.note;
   elements.viewTabs.forEach((button) => {
     const isActive = button.dataset.view === view;
     button.classList.toggle("is-active", isActive);
