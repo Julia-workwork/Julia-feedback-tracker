@@ -146,6 +146,7 @@ export function normalizeFirmwareRow(row) {
 
 export function normalizeBetaRow(row) {
   return {
+    rowNumber: clean(row.__rowNumber || row.rowNumber),
     date: clean(row.Date),
     productModel: clean(row["Product Model"]),
     version: clean(row.Version),
@@ -169,6 +170,17 @@ export function normalizeBetaRow(row) {
     notes: clean(row.Notes),
     rawInput: clean(row["Raw Input"]),
   };
+}
+
+export function betaDetailHeading(record) {
+  return [record.productModel, record.testItem, record.testerType]
+    .map(clean)
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function betaDetailLabel(header) {
+  return header === "Notes" ? "Process Follow-up" : header;
 }
 
 export function isFirmwareReleaseLikeFeedbackRow(row) {

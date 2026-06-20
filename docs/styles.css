@@ -1582,6 +1582,15 @@ body.detail-open {
   text-transform: none !important;
 }
 
+.beta-detail-heading {
+  margin: 12px 0 8px;
+  color: #5f6d7f;
+  font-size: 0.9rem;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .copy-toast {
   position: fixed;
   right: 22px;

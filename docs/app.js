@@ -191,6 +191,7 @@ function setBetaMessage(text, isError = false) {
 }
 
 function setBetaInputMessage(text, isError = false) {
+  if (!elements.betaInputMessage) return;
   elements.betaInputMessage.textContent = text;
   elements.betaInputMessage.classList.toggle("state-message--error", isError);
   elements.betaInputMessage.classList.toggle("is-hidden", !text);
@@ -205,6 +206,7 @@ function isAdmin() {
 }
 
 function updateBetaInputAccess() {
+  if (!elements.betaInputPanel || !elements.betaInputForm) return;
   const allowed = isAdmin();
   elements.betaInputPanel.hidden = !allowed;
   if (!allowed) {
