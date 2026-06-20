@@ -23,7 +23,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-tab-click-fix";
+} from "./lib/domain.mjs?v=20260620-feedback-add";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -136,6 +136,26 @@ const elements = {
   dateFrom: document.querySelector("#date-from-filter"),
   dateTo: document.querySelector("#date-to-filter"),
   refresh: document.querySelector("#refresh-button"),
+  feedbackAdd: document.querySelector("#feedback-add-button"),
+  feedbackClose: document.querySelector("#feedback-close-button"),
+  feedbackInputPanel: document.querySelector("#feedback-input-panel"),
+  feedbackInputForm: document.querySelector("#feedback-input-form"),
+  feedbackInputDate: document.querySelector("#feedback-input-date"),
+  feedbackInputModel: document.querySelector("#feedback-input-model"),
+  feedbackInputId: document.querySelector("#feedback-input-id"),
+  feedbackInputEmail: document.querySelector("#feedback-input-email"),
+  feedbackInputCategory: document.querySelector("#feedback-input-category"),
+  feedbackInputPriority: document.querySelector("#feedback-input-priority"),
+  feedbackInputRequest: document.querySelector("#feedback-input-request"),
+  feedbackInputChannel: document.querySelector("#feedback-input-channel"),
+  feedbackInputStatus: document.querySelector("#feedback-input-status"),
+  feedbackInputKeyPoints: document.querySelector("#feedback-input-key-points"),
+  feedbackInputUpgrade: document.querySelector("#feedback-input-upgrade"),
+  feedbackInputChinese: document.querySelector("#feedback-input-chinese"),
+  feedbackInputNotes: document.querySelector("#feedback-input-notes"),
+  feedbackSave: document.querySelector("#feedback-save-button"),
+  feedbackClear: document.querySelector("#feedback-clear-button"),
+  feedbackInputMessage: document.querySelector("#feedback-input-message"),
   message: document.querySelector("#state-message"),
   summary: document.querySelector("#summary"),
   board: document.querySelector("#board"),
@@ -217,6 +237,13 @@ function setBetaInputMessage(text, isError = false) {
   elements.betaInputMessage.classList.toggle("is-hidden", !text);
 }
 
+function setFeedbackInputMessage(text, isError = false) {
+  if (!elements.feedbackInputMessage) return;
+  elements.feedbackInputMessage.textContent = text;
+  elements.feedbackInputMessage.classList.toggle("state-message--error", isError);
+  elements.feedbackInputMessage.classList.toggle("is-hidden", !text);
+}
+
 function canEdit() {
   return EDIT_ROLES.has(state.auth?.role);
 }
@@ -234,6 +261,22 @@ function updateBetaInputAccess() {
     setBetaInputMessage("");
   }
   elements.betaInputForm
+    .querySelectorAll("input, select, textarea, button")
+    .forEach((control) => {
+      control.disabled = !allowed;
+    });
+}
+
+function updateFeedbackInputAccess() {
+  if (!elements.feedbackAdd || !elements.feedbackInputPanel || !elements.feedbackInputForm) return;
+  const allowed = isAdmin();
+  elements.feedbackAdd.hidden = !allowed;
+  elements.feedbackInputPanel.hidden = !allowed;
+  if (!allowed) {
+    elements.feedbackInputPanel.classList.add("is-hidden");
+    setFeedbackInputMessage("");
+  }
+  elements.feedbackInputForm
     .querySelectorAll("input, select, textarea, button")
     .forEach((control) => {
       control.disabled = !allowed;
@@ -264,6 +307,7 @@ function showDashboard() {
   elements.loginScreen.classList.add("is-hidden");
   elements.appShell.classList.remove("is-hidden");
   elements.authRole.textContent = `${state.auth?.role || "Viewer"} · ${state.auth?.username || ""}`;
+  updateFeedbackInputAccess();
   updateBetaInputAccess();
 }
 
@@ -955,6 +999,99 @@ function syncChangesToGoogleSheet(record, changes) {
       if (payload?.ok) return payload;
       throw new Error(payload?.message || "Update failed.");
     });
+}
+
+function feedbackPayloadFromInput() {
+  return {
+    Date: elements.feedbackInputDate.value.trim(),
+    Model: elements.feedbackInputModel.value.trim(),
+    ID: elements.feedbackInputId.value.trim(),
+    Email: elements.feedbackInputEmail.value.trim(),
+    Profile: "",
+    "Update Category": elements.feedbackInputCategory.value.trim(),
+    "Key Points": elements.feedbackInputKeyPoints.value.trim(),
+    "Upgrade requirements": elements.feedbackInputUpgrade.value.trim(),
+    Chinese: elements.feedbackInputChinese.value.trim(),
+    Notes: elements.feedbackInputNotes.value.trim(),
+    "Request number": elements.feedbackInputRequest.value.trim(),
+    ING: "",
+    Priority: elements.feedbackInputPriority.value.trim(),
+    DONE: "",
+    Channel: elements.feedbackInputChannel.value.trim(),
+    "Dashboard Status": elements.feedbackInputStatus.value.trim() || "To Submit",
+  };
+}
+
+function syncFeedbackRecord(record) {
+  return callGoogleAppsScript({
+    action: "addFeedbackRecord",
+    authToken: state.auth?.token || "",
+    record: JSON.stringify(record),
+  }).then((payload) => {
+    if (payload?.ok) return payload;
+    throw new Error(payload?.message || "Save failed.");
+  });
+}
+
+function clearFeedbackInput() {
+  if (!isAdmin()) {
+    showToast("Only Admin can clear feedback input.");
+    return;
+  }
+  elements.feedbackInputForm.reset();
+  elements.feedbackInputPriority.value = "P2";
+  elements.feedbackInputStatus.value = "To Submit";
+  setFeedbackInputMessage("");
+}
+
+function toggleFeedbackInput(open) {
+  if (!isAdmin()) {
+    showToast("Only Admin can add feedback records.");
+    return;
+  }
+  elements.feedbackInputPanel.classList.toggle("is-hidden", !open);
+  elements.feedbackAdd.textContent = open ? "Close Add" : "+ Add Feedback";
+  if (open && !elements.feedbackInputDate.value) {
+    elements.feedbackInputDate.value = new Date().toISOString().slice(0, 10);
+  }
+}
+
+async function saveFeedbackInput() {
+  if (!isAdmin()) {
+    setFeedbackInputMessage("Only Admin can save feedback records.", true);
+    return;
+  }
+  if (!elements.feedbackInputKeyPoints.value.trim() && !elements.feedbackInputUpgrade.value.trim()) {
+    setFeedbackInputMessage("Key Points or Original Feedback is required.", true);
+    return;
+  }
+  if (!elements.feedbackInputDate.value.trim()) {
+    elements.feedbackInputDate.value = new Date().toISOString().slice(0, 10);
+  }
+
+  const record = feedbackPayloadFromInput();
+  elements.feedbackSave.disabled = true;
+  elements.feedbackSave.textContent = "Saving...";
+  setFeedbackInputMessage("Saving feedback record...");
+  try {
+    await verifyEditPermission();
+    const result = await syncFeedbackRecord(record);
+    const normalized = normalizeRow({
+      ...record,
+      "Last Modified At": result.lastModifiedAt || "",
+      "Last Modified By": result.lastModifiedBy || "",
+    });
+    state.records.unshift(normalized);
+    renderModelOptions();
+    render();
+    clearFeedbackInput();
+    setFeedbackInputMessage("Saved to Feedback Board.");
+  } catch (error) {
+    setFeedbackInputMessage(error instanceof Error ? error.message : "Save failed.", true);
+  } finally {
+    elements.feedbackSave.disabled = false;
+    elements.feedbackSave.textContent = "Save to Sheet";
+  }
 }
 
 function betaPayloadFromInput() {
@@ -1739,6 +1876,16 @@ elements.firmwareDateTo.addEventListener("change", () => {
   renderFirmware();
 });
 elements.firmwareRefresh.addEventListener("click", load);
+elements.feedbackAdd.addEventListener("click", () => {
+  const isClosed = elements.feedbackInputPanel.classList.contains("is-hidden");
+  toggleFeedbackInput(isClosed);
+});
+elements.feedbackClose.addEventListener("click", () => toggleFeedbackInput(false));
+elements.feedbackClear.addEventListener("click", clearFeedbackInput);
+elements.feedbackInputForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveFeedbackInput();
+});
 elements.betaModel.addEventListener("change", () => {
   state.betaFilters.model = elements.betaModel.value;
   renderBetaFilterOptions();

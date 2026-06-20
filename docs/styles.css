@@ -216,7 +216,8 @@ body.detail-open {
   display: grid;
   grid-template-columns:
     minmax(150px, 210px) minmax(240px, 1fr) minmax(160px, 220px)
-    minmax(130px, 170px) minmax(320px, 390px) minmax(118px, 150px);
+    minmax(130px, 170px) minmax(320px, 390px) minmax(118px, 150px)
+    minmax(132px, 170px);
   gap: 16px;
   align-items: end;
   position: sticky;
@@ -264,6 +265,12 @@ body.detail-open {
   font-weight: 800;
   padding-right: 12px;
   padding-left: 12px;
+}
+
+.filter-bar .add-record-button {
+  border-color: #f2c230;
+  background: #f2c230;
+  color: #050505;
 }
 
 .date-range-filter {
@@ -1270,6 +1277,10 @@ body.detail-open {
   display: none;
 }
 
+.quick-input-panel.is-hidden {
+  display: none;
+}
+
 .quick-input-summary {
   display: flex;
   align-items: center;
@@ -1320,6 +1331,10 @@ body.detail-open {
 
 .quick-input-panel:not([open]) .quick-input-toggle::before {
   content: "Open ";
+}
+
+.feedback-input-panel .quick-input-toggle::before {
+  content: none !important;
 }
 
 .beta-input-form {
@@ -1408,6 +1423,15 @@ body.detail-open {
 .quick-input-actions #beta-save-button {
   border-color: #f2c230;
   background: #f2c230;
+}
+
+.quick-input-actions #feedback-save-button {
+  border-color: #f2c230;
+  background: #f2c230;
+}
+
+.feedback-wide-field {
+  grid-column: span 3;
 }
 
 .quick-input-actions button:disabled {
@@ -1632,9 +1656,11 @@ body.detail-open {
   }
 
   .beta-input-grid,
+  .feedback-wide-field,
   .beta-draft-grid,
   .beta-card {
     grid-template-columns: 1fr;
+    grid-column: auto;
   }
 
   .beta-draft-grid label:first-child,

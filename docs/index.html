@@ -88,6 +88,89 @@
             </label>
           </fieldset>
           <button id="refresh-button" type="button">Refresh</button>
+          <button id="feedback-add-button" class="add-record-button" type="button" hidden>+ Add Feedback</button>
+        </section>
+
+        <section id="feedback-input-panel" class="quick-input-panel feedback-input-panel is-hidden" aria-label="Quick feedback input" hidden>
+          <div class="quick-input-summary">
+            <div>
+              <p class="eyebrow">Admin Feedback Input</p>
+              <h2>Add user feedback</h2>
+              <p>Create a new record in FW update suggestion&amp;Reqs.</p>
+            </div>
+            <button id="feedback-close-button" class="quick-input-toggle" type="button">Close input</button>
+          </div>
+          <form id="feedback-input-form" class="beta-input-form feedback-input-form">
+            <div class="beta-input-grid">
+              <label>
+                Date
+                <input id="feedback-input-date" type="date" />
+              </label>
+              <label>
+                Product Model
+                <input id="feedback-input-model" placeholder="HA2, HD1, H1..." />
+              </label>
+              <label>
+                User ID
+                <input id="feedback-input-id" placeholder="User name or account" />
+              </label>
+              <label>
+                Email
+                <input id="feedback-input-email" type="email" placeholder="user@example.com" />
+              </label>
+              <label>
+                Update Category
+                <input id="feedback-input-category" placeholder="BUG, Feature Request..." />
+              </label>
+              <label>
+                Priority
+                <select id="feedback-input-priority">
+                  <option value="">-</option>
+                  <option>P0</option>
+                  <option>P1</option>
+                  <option selected>P2</option>
+                </select>
+              </label>
+              <label>
+                Request number
+                <input id="feedback-input-request" placeholder="RT20260620001" />
+              </label>
+              <label>
+                Channel
+                <input id="feedback-input-channel" placeholder="Email, Facebook, WhatsApp..." />
+              </label>
+              <label>
+                Status
+                <select id="feedback-input-status">
+                  <option selected>To Submit</option>
+                  <option>Submitted</option>
+                  <option>In Progress</option>
+                  <option>Resolved</option>
+                </select>
+              </label>
+              <label class="beta-raw-field feedback-wide-field">
+                Key Points
+                <textarea id="feedback-input-key-points" rows="3" placeholder="Engineer-ready key point..."></textarea>
+              </label>
+              <label class="beta-raw-field feedback-wide-field">
+                Original Feedback
+                <textarea id="feedback-input-upgrade" rows="4" placeholder="Paste user original feedback..."></textarea>
+              </label>
+              <label class="beta-raw-field feedback-wide-field">
+                Chinese
+                <textarea id="feedback-input-chinese" rows="4" placeholder="Chinese translation of the original feedback..."></textarea>
+              </label>
+              <label class="beta-raw-field feedback-wide-field">
+                Notes
+                <textarea id="feedback-input-notes" rows="3" placeholder="Internal notes..."></textarea>
+              </label>
+            </div>
+            <div class="quick-input-actions">
+              <button id="feedback-save-button" type="submit">Save to Sheet</button>
+              <button id="feedback-clear-button" type="button">Clear</button>
+            </div>
+            <p id="feedback-input-message" class="state-message is-hidden"></p>
+          </form>
         </section>
 
         <section id="summary" class="summary-strip" aria-label="Feedback summary"></section>
@@ -312,6 +395,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260620-tab-click-fix"></script>
+    <script type="module" src="./app.js?v=20260620-feedback-add"></script>
   </body>
 </html>
