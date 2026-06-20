@@ -21,7 +21,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-beta-row2-header";
+} from "./lib/domain.mjs?v=20260620-beta-appscript-read";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -1406,7 +1406,11 @@ async function loadFirmwareRecords() {
 }
 
 async function loadBetaRecords() {
-  const rows = await loadSheetRows({ sheetName: BETA_SHEET_NAME, requiredHeaders: BETA_REQUIRED_HEADERS });
+  const payload = await callGoogleAppsScript({ action: "getBetaTestRecords" });
+  if (!payload?.ok) {
+    throw new Error(payload?.message || "Beta Test Progress is not available yet.");
+  }
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
   const missing = validateBetaRows(rows);
   if (missing.length) {
     throw new Error(`Beta Test Progress is missing columns: ${missing.join(", ")}`);
