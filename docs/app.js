@@ -23,7 +23,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-beta-follow-up";
+} from "./lib/domain.mjs?v=20260620-beta-editable-card";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -614,8 +614,8 @@ function betaRecordTemplate(record, index) {
       </div>
       <div class="beta-card-meta">
         <span>${escapeHtml(record.version || "-")}</span>
+        <span>${escapeHtml(record.testItem || "-")}</span>
         <span>${escapeHtml(record.testType || "-")}</span>
-        <span>${escapeHtml(record.testerOwner || "-")}</span>
       </div>
       <div class="beta-card-chips">${chips}</div>
       <p class="beta-next-action">${escapeHtml(record.nextAction || record.notes || "-")}</p>
@@ -623,14 +623,29 @@ function betaRecordTemplate(record, index) {
   `;
 }
 
+function inputTemplate(name, value, type = "text") {
+  return `<input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value)}" />`;
+}
+
+function textareaTemplate(name, value, rows = 4) {
+  return `<textarea name="${escapeHtml(name)}" rows="${rows}">${escapeHtml(value)}</textarea>`;
+}
+
+function betaSelectTemplate(name, value, options) {
+  return `
+    <select name="${escapeHtml(name)}">
+      ${options
+        .map((option) => `<option value="${escapeHtml(option)}"${option === value ? " selected" : ""}>${escapeHtml(option || "-")}</option>`)
+        .join("")}
+    </select>
+  `;
+}
+
+function betaEditableRow(record, header, value, fieldHtml, size = "medium") {
+  return canEdit() ? editableDetailRow(betaDetailLabel(header), fieldHtml, size) : detailRow(betaDetailLabel(header), value);
+}
+
 function openBetaDetail(record) {
-  const processFollowUpRow = isAdmin()
-    ? editableDetailRow(
-        betaDetailLabel("Notes"),
-        `<textarea name="Notes" rows="5">${escapeHtml(record.notes)}</textarea>`,
-        "wide",
-      )
-    : detailRow(betaDetailLabel("Notes"), record.notes);
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
@@ -650,47 +665,63 @@ function openBetaDetail(record) {
     </div>
     <dl class="detail-list">
       ${detailRow("Date", record.date)}
-      ${detailRow("Product Model", record.productModel)}
-      ${detailRow("Version", record.version)}
-      ${detailRow("Test Type", record.testType)}
-      ${detailRow("Tester Type", record.testerType)}
+      ${betaEditableRow(record, "Product Model", record.productModel, inputTemplate("Product Model", record.productModel))}
+      ${betaEditableRow(record, "Version", record.version, inputTemplate("Version", record.version))}
+      ${betaEditableRow(
+        record,
+        "Test Type",
+        record.testType,
+        betaSelectTemplate("Test Type", record.testType, ["", "Firmware Beta", "APP Beta", "CPS Beta", "Hardware Test", "Regression Test"]),
+      )}
+      ${betaEditableRow(
+        record,
+        "Tester Type",
+        record.testerType,
+        betaSelectTemplate("Tester Type", record.testerType, ["", "Internal Test", "User Beta Test", "Engineer Test", "KOC Test"]),
+      )}
       ${detailRow("Tester / Owner", record.testerOwner)}
-      ${detailRow("Issue Source", record.issueSource)}
-      ${detailRow("Test Item", record.testItem)}
-      ${detailRow("Issue Found", record.issueFound)}
-      ${detailRow("Key Point", record.keyPoint)}
-      ${detailRow("Severity", record.severity)}
-      ${detailRow("Priority", record.priority)}
-      ${detailRow("Status", record.status)}
-      ${detailRow("Assigned To", record.assignedTo)}
-      ${detailRow("Engineering Response", record.engineeringResponse)}
-      ${detailRow("Next Action", record.nextAction)}
-      ${detailRow("Target Date", record.targetDate)}
-      ${detailRow("Resolved Date", record.resolvedDate)}
-      ${detailRow("Related Request Number", record.relatedRequestNumber)}
-      ${detailRow("Related Firmware Version", record.relatedFirmwareVersion)}
-      ${processFollowUpRow}
-      ${detailRow("Raw Input", record.rawInput)}
+      ${betaEditableRow(record, "Issue Source", record.issueSource, inputTemplate("Issue Source", record.issueSource))}
+      ${betaEditableRow(record, "Test Item", record.testItem, inputTemplate("Test Item", record.testItem))}
+      ${betaEditableRow(record, "Issue Found", record.issueFound, textareaTemplate("Issue Found", record.issueFound, 4), "wide")}
+      ${betaEditableRow(record, "Key Point", record.keyPoint, textareaTemplate("Key Point", record.keyPoint, 3), "wide")}
+      ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, ["", "Critical", "High", "Medium", "Low"]), "short")}
+      ${betaEditableRow(record, "Priority", record.priority, betaSelectTemplate("Priority", record.priority, ["", "P0", "P1", "P2"]), "short")}
+      ${betaEditableRow(
+        record,
+        "Status",
+        record.status,
+        betaSelectTemplate("Status", record.status, ["", "Open", "Need Review", "Reproducing", "In Progress", "Resolved", "Closed"]),
+        "short",
+      )}
+      ${betaEditableRow(record, "Assigned To", record.assignedTo, inputTemplate("Assigned To", record.assignedTo))}
+      ${betaEditableRow(record, "Engineering Response", record.engineeringResponse, textareaTemplate("Engineering Response", record.engineeringResponse, 3), "wide")}
+      ${betaEditableRow(record, "Next Action", record.nextAction, textareaTemplate("Next Action", record.nextAction, 3), "wide")}
+      ${betaEditableRow(record, "Target Date", record.targetDate, inputTemplate("Target Date", record.targetDate, "date"), "short")}
+      ${betaEditableRow(record, "Resolved Date", record.resolvedDate, inputTemplate("Resolved Date", record.resolvedDate, "date"), "short")}
+      ${betaEditableRow(record, "Related Request Number", record.relatedRequestNumber, inputTemplate("Related Request Number", record.relatedRequestNumber))}
+      ${betaEditableRow(record, "Related Firmware Version", record.relatedFirmwareVersion, inputTemplate("Related Firmware Version", record.relatedFirmwareVersion))}
+      ${betaEditableRow(record, "Notes", record.notes, textareaTemplate("Notes", record.notes, 5), "wide")}
+      ${detailRow("Edit Log", record.editLog)}
     </dl>
-    ${isAdmin() ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
+    ${canEdit() ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
   `;
   elements.detail.querySelector(".beta-save-follow-up")?.addEventListener("click", async () => {
-    if (!isAdmin()) {
-      showToast("Only Admin can edit beta follow-up.");
+    if (!canEdit()) {
+      showToast("You do not have permission to edit.");
       return;
     }
-    const notes = elements.detail.querySelector('[name="Notes"]')?.value.trim() || "";
-    if ((record.notes || "") === notes) {
+    const changes = betaChangedFields(record);
+    if (!Object.keys(changes).length) {
       showToast("No changes to save");
       return;
     }
     setDetailSaving(true);
     try {
-      await syncBetaFollowUp(record, notes);
-      record.notes = notes;
+      const result = await syncBetaRecordChanges(record, changes);
+      applySavedBetaChanges(record, changes, result);
       renderBeta();
       openBetaDetail(record);
-      showToast("Process follow-up saved");
+      showToast("Changes saved");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Update failed");
     } finally {
@@ -939,12 +970,12 @@ function syncBetaTestRecord(record) {
   });
 }
 
-function syncBetaFollowUp(record, notes) {
+function syncBetaRecordChanges(record, changes) {
   return callGoogleAppsScript({
     action: "updateBetaTestRecord",
     authToken: state.auth?.token || "",
     match: JSON.stringify(betaRecordMatchPayload(record)),
-    changes: JSON.stringify({ Notes: notes }),
+    changes: JSON.stringify(changes),
   }).then((payload) => {
     if (payload?.ok) return payload;
     throw new Error(payload?.message || "Update failed.");
@@ -1142,6 +1173,55 @@ function changedFields(record) {
     }
     return changes;
   }, {});
+}
+
+const BETA_FIELD_TO_RECORD_KEY = {
+  "Product Model": "productModel",
+  Version: "version",
+  "Test Type": "testType",
+  "Tester Type": "testerType",
+  "Issue Source": "issueSource",
+  "Test Item": "testItem",
+  "Issue Found": "issueFound",
+  "Key Point": "keyPoint",
+  Severity: "severity",
+  Priority: "priority",
+  Status: "status",
+  "Assigned To": "assignedTo",
+  "Engineering Response": "engineeringResponse",
+  "Next Action": "nextAction",
+  "Target Date": "targetDate",
+  "Resolved Date": "resolvedDate",
+  "Related Request Number": "relatedRequestNumber",
+  "Related Firmware Version": "relatedFirmwareVersion",
+  Notes: "notes",
+};
+
+function betaOriginalEditableValues(record) {
+  return Object.entries(BETA_FIELD_TO_RECORD_KEY).reduce((values, [field, key]) => {
+    values[field] = record[key] || "";
+    return values;
+  }, {});
+}
+
+function betaChangedFields(record) {
+  const current = fieldValuesFromDetail();
+  const original = betaOriginalEditableValues(record);
+  return Object.entries(current).reduce((changes, [field, value]) => {
+    if (!Object.prototype.hasOwnProperty.call(original, field)) return changes;
+    if ((original[field] || "") !== value) {
+      changes[field] = value;
+    }
+    return changes;
+  }, {});
+}
+
+function applySavedBetaChanges(record, changes, result = {}) {
+  Object.entries(changes).forEach(([field, value]) => {
+    const key = BETA_FIELD_TO_RECORD_KEY[field];
+    if (key) record[key] = value;
+  });
+  if (result.editLog !== undefined) record.editLog = result.editLog;
 }
 
 function changesSummary(record, changes) {

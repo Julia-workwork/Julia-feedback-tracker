@@ -44,6 +44,7 @@ export const BETA_TEST_HEADERS = [
   "Related Request Number",
   "Related Firmware Version",
   "Notes",
+  "Edit Log",
   "Raw Input",
 ];
 
@@ -168,6 +169,7 @@ export function normalizeBetaRow(row) {
     relatedRequestNumber: clean(row["Related Request Number"]),
     relatedFirmwareVersion: clean(row["Related Firmware Version"]),
     notes: clean(row.Notes),
+    editLog: clean(row["Edit Log"]),
     rawInput: clean(row["Raw Input"]),
   };
 }
