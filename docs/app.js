@@ -23,7 +23,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-feedback-raw-input";
+} from "./lib/domain.mjs?v=20260621-feedback-folded-fields";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -140,6 +140,7 @@ const elements = {
   feedbackClose: document.querySelector("#feedback-close-button"),
   feedbackInputPanel: document.querySelector("#feedback-input-panel"),
   feedbackInputForm: document.querySelector("#feedback-input-form"),
+  feedbackGeneratedFields: document.querySelector("#feedback-generated-fields"),
   feedbackRawInput: document.querySelector("#feedback-raw-input"),
   feedbackInputDate: document.querySelector("#feedback-input-date"),
   feedbackInputModel: document.querySelector("#feedback-input-model"),
@@ -1195,6 +1196,7 @@ function analyzeFeedbackInput() {
   if (draft.channel && !elements.feedbackInputChannel.value.trim()) elements.feedbackInputChannel.value = draft.channel;
   if (draft.keyPoints && !elements.feedbackInputKeyPoints.value.trim()) elements.feedbackInputKeyPoints.value = draft.keyPoints;
   elements.feedbackInputUpgrade.value = draft.originalFeedback;
+  elements.feedbackGeneratedFields.open = true;
   setFeedbackInputMessage("Draft generated. Original Feedback keeps the user's original words.");
 }
 

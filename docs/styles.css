@@ -1353,6 +1353,60 @@ body.detail-open {
   content: none !important;
 }
 
+.feedback-generated-fields {
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 4%);
+  overflow: hidden;
+}
+
+.feedback-generated-fields summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  list-style: none;
+  padding: 16px 18px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.feedback-generated-fields summary::-webkit-details-marker {
+  display: none;
+}
+
+.feedback-generated-fields summary::after {
+  content: "+";
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 999px;
+  background: #f2c230;
+  color: #050505;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.feedback-generated-fields[open] summary::after {
+  content: "-";
+}
+
+.feedback-generated-fields summary small {
+  color: rgb(255 255 255 / 62%);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.feedback-generated-grid {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  padding: 16px 18px 18px;
+}
+
 .beta-input-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1362,6 +1416,7 @@ body.detail-open {
 }
 
 .feedback-input-form > .feedback-wide-field,
+.feedback-input-form > .feedback-generated-fields,
 .feedback-input-form > .quick-input-actions,
 .feedback-input-form > .state-message {
   grid-column: 1 / -1;

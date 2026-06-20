@@ -155,23 +155,31 @@
                   <option>Resolved</option>
                 </select>
               </label>
-              <label class="beta-raw-field feedback-wide-field">
-                Key Points
-                <textarea id="feedback-input-key-points" rows="3" placeholder="Engineer-ready key point..."></textarea>
-              </label>
-              <label class="beta-raw-field feedback-wide-field">
-                Original Feedback
-                <textarea id="feedback-input-upgrade" rows="4" placeholder="Paste user original feedback..."></textarea>
-              </label>
-              <label class="beta-raw-field feedback-wide-field">
-                Chinese
-                <textarea id="feedback-input-chinese" rows="4" placeholder="Chinese translation of the original feedback..."></textarea>
-              </label>
-              <label class="beta-raw-field feedback-wide-field">
-                Notes
-                <textarea id="feedback-input-notes" rows="3" placeholder="Internal notes..."></textarea>
-              </label>
             </div>
+            <details id="feedback-generated-fields" class="feedback-generated-fields">
+              <summary>
+                <span>Generated fields</span>
+                <small>Key Points, Original Feedback, Chinese, Notes</small>
+              </summary>
+              <div class="feedback-generated-grid">
+                <label class="beta-raw-field feedback-wide-field">
+                  Key Points
+                  <textarea id="feedback-input-key-points" rows="3" placeholder="Engineer-ready key point..."></textarea>
+                </label>
+                <label class="beta-raw-field feedback-wide-field">
+                  Original Feedback
+                  <textarea id="feedback-input-upgrade" rows="4" placeholder="Paste user original feedback..."></textarea>
+                </label>
+                <label class="beta-raw-field feedback-wide-field">
+                  Chinese
+                  <textarea id="feedback-input-chinese" rows="4" placeholder="Chinese translation of the original feedback..."></textarea>
+                </label>
+                <label class="beta-raw-field feedback-wide-field">
+                  Notes
+                  <textarea id="feedback-input-notes" rows="3" placeholder="Internal notes..."></textarea>
+                </label>
+              </div>
+            </details>
             <div class="quick-input-actions">
               <button id="feedback-analyze-button" type="button">Analyze</button>
               <button id="feedback-save-button" type="submit">Save to Sheet</button>
@@ -403,6 +411,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260620-feedback-raw-input"></script>
+    <script type="module" src="./app.js?v=20260621-feedback-folded-fields"></script>
   </body>
 </html>
