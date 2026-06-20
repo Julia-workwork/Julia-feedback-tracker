@@ -21,7 +21,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-beta-appscript-read";
+} from "./lib/domain.mjs?v=20260620-beta-admin-collapse";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -127,6 +127,7 @@ const elements = {
   firmwareSummary: document.querySelector("#firmware-summary"),
   firmwareMessage: document.querySelector("#firmware-message"),
   firmwareList: document.querySelector("#firmware-list"),
+  betaInputPanel: document.querySelector("#beta-input-panel"),
   betaInputForm: document.querySelector("#beta-input-form"),
   betaRawInput: document.querySelector("#beta-raw-input"),
   betaInputDate: document.querySelector("#beta-input-date"),
@@ -196,6 +197,24 @@ function canEdit() {
   return EDIT_ROLES.has(state.auth?.role);
 }
 
+function isAdmin() {
+  return String(state.auth?.role || "").trim() === "Admin";
+}
+
+function updateBetaInputAccess() {
+  const allowed = isAdmin();
+  elements.betaInputPanel.hidden = !allowed;
+  if (!allowed) {
+    elements.betaInputPanel.removeAttribute("open");
+    setBetaInputMessage("");
+  }
+  elements.betaInputForm
+    .querySelectorAll("input, select, textarea, button")
+    .forEach((control) => {
+      control.disabled = !allowed;
+    });
+}
+
 function setLoginMessage(text, isError = false) {
   elements.loginMessage.textContent = text;
   elements.loginMessage.classList.toggle("state-message--error", isError);
@@ -220,6 +239,7 @@ function showDashboard() {
   elements.loginScreen.classList.add("is-hidden");
   elements.appShell.classList.remove("is-hidden");
   elements.authRole.textContent = `${state.auth?.role || "Viewer"} · ${state.auth?.username || ""}`;
+  updateBetaInputAccess();
 }
 
 async function credentialHash(username, password) {
@@ -871,6 +891,10 @@ function syncBetaTestRecord(record) {
 }
 
 function analyzeBetaInput() {
+  if (!isAdmin()) {
+    showToast("Only Admin can analyze beta input.");
+    return;
+  }
   const rawInput = elements.betaRawInput.value.trim();
   if (!rawInput) {
     setBetaInputMessage("Paste beta test content first.", true);
@@ -893,6 +917,10 @@ function analyzeBetaInput() {
 }
 
 function clearBetaInput() {
+  if (!isAdmin()) {
+    showToast("Only Admin can clear beta input.");
+    return;
+  }
   elements.betaInputForm.reset();
   elements.betaInputKeyPoint.value = "";
   elements.betaInputPriority.value = "P2";
@@ -902,8 +930,8 @@ function clearBetaInput() {
 }
 
 async function saveBetaInput() {
-  if (!canEdit()) {
-    setBetaInputMessage("You do not have permission to save records.", true);
+  if (!isAdmin()) {
+    setBetaInputMessage("Only Admin can save beta test records.", true);
     return;
   }
   if (!elements.betaRawInput.value.trim()) {

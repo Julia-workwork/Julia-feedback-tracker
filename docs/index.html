@@ -132,11 +132,15 @@
       </section>
 
       <section id="beta-view" class="dashboard-view is-hidden" data-view-panel="beta">
-        <section class="quick-input-panel" aria-label="Quick beta test input">
-          <div>
-            <p class="eyebrow">Quick Beta Input</p>
-            <h2>Paste a test note, review the draft, then save it to Beta Test Progress.</h2>
-          </div>
+        <details id="beta-input-panel" class="quick-input-panel" aria-label="Quick beta test input">
+          <summary class="quick-input-summary">
+            <div>
+              <p class="eyebrow">Admin Beta Input</p>
+              <h2>Add beta test note</h2>
+              <p>Paste, analyze, review, then save it to Beta Test Progress.</p>
+            </div>
+            <span class="quick-input-toggle">input</span>
+          </summary>
           <form id="beta-input-form" class="beta-input-form">
             <label class="beta-raw-field">
               Raw Input
@@ -231,7 +235,7 @@
             </div>
             <p id="beta-input-message" class="state-message is-hidden"></p>
           </form>
-        </section>
+        </details>
 
         <section class="filter-bar beta-filter-bar" aria-label="Beta test filters">
           <label>
@@ -304,6 +308,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260620-beta-appscript-read"></script>
+    <script type="module" src="./app.js?v=20260620-beta-admin-collapse"></script>
   </body>
 </html>
