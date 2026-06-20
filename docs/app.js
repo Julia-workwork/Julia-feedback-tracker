@@ -23,7 +23,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-beta-item-before-type";
+} from "./lib/domain.mjs?v=20260620-tab-click-fix";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -1677,9 +1677,9 @@ async function load() {
 function setActiveView(view) {
   state.activeView = view;
   const hero = HERO_COPY[view] || HERO_COPY.feedback;
-  elements.heroEyebrow.textContent = hero.eyebrow;
-  elements.heroTitle.textContent = hero.title;
-  elements.heroNote.textContent = hero.note;
+  if (elements.heroEyebrow) elements.heroEyebrow.textContent = hero.eyebrow;
+  if (elements.heroTitle) elements.heroTitle.textContent = hero.title;
+  if (elements.heroNote) elements.heroNote.textContent = hero.note;
   elements.viewTabs.forEach((button) => {
     const isActive = button.dataset.view === view;
     button.classList.toggle("is-active", isActive);
