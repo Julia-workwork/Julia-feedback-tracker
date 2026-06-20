@@ -1355,9 +1355,16 @@ body.detail-open {
 
 .beta-input-form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   border-top: 1px solid rgb(255 255 255 / 12%);
   padding: 24px 28px 28px;
+}
+
+.feedback-input-form > .feedback-wide-field,
+.feedback-input-form > .quick-input-actions,
+.feedback-input-form > .state-message {
+  grid-column: 1 / -1;
 }
 
 .beta-input-form label {
@@ -1421,10 +1428,13 @@ body.detail-open {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .quick-input-actions button {
   min-height: 42px;
+  width: auto;
   border: 1px solid #ffffff;
   border-radius: 999px;
   background: #ffffff;
