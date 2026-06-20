@@ -22,6 +22,31 @@ export const STATUS_BY_LABEL = {
   Resolved: "resolved",
 };
 
+export const BETA_TEST_HEADERS = [
+  "Date",
+  "Product Model",
+  "Version",
+  "Test Type",
+  "Tester Type",
+  "Tester / Owner",
+  "Issue Source",
+  "Test Item",
+  "Issue Found",
+  "Key Point",
+  "Severity",
+  "Priority",
+  "Status",
+  "Assigned To",
+  "Engineering Response",
+  "Next Action",
+  "Target Date",
+  "Resolved Date",
+  "Related Request Number",
+  "Related Firmware Version",
+  "Notes",
+  "Raw Input",
+];
+
 export function clean(value) {
   return String(value ?? "").trim();
 }
@@ -117,6 +142,45 @@ export function normalizeFirmwareRow(row) {
     closedRequestsRaw: clean(row["关闭需求"]),
     closedRequests: parseClosedRequests(row["关闭需求"]),
   };
+}
+
+export function normalizeBetaRow(row) {
+  return {
+    rowNumber: clean(row.__rowNumber || row.rowNumber),
+    date: clean(row.Date),
+    productModel: clean(row["Product Model"]),
+    version: clean(row.Version),
+    testType: clean(row["Test Type"]),
+    testerType: clean(row["Tester Type"]),
+    testerOwner: clean(row["Tester / Owner"]),
+    issueSource: clean(row["Issue Source"]),
+    testItem: clean(row["Test Item"]),
+    issueFound: clean(row["Issue Found"]),
+    keyPoint: clean(row["Key Point"]),
+    severity: clean(row.Severity),
+    priority: clean(row.Priority),
+    status: clean(row.Status),
+    assignedTo: clean(row["Assigned To"]),
+    engineeringResponse: clean(row["Engineering Response"]),
+    nextAction: clean(row["Next Action"]),
+    targetDate: clean(row["Target Date"]),
+    resolvedDate: clean(row["Resolved Date"]),
+    relatedRequestNumber: clean(row["Related Request Number"]),
+    relatedFirmwareVersion: clean(row["Related Firmware Version"]),
+    notes: clean(row.Notes),
+    rawInput: clean(row["Raw Input"]),
+  };
+}
+
+export function betaDetailHeading(record) {
+  return [record.productModel, record.testItem, record.testerType]
+    .map(clean)
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function betaDetailLabel(header) {
+  return header === "Notes" ? "Process Follow-up" : header;
 }
 
 export function isFirmwareReleaseLikeFeedbackRow(row) {
@@ -249,6 +313,31 @@ export function uniqueFirmwareVersions(releases) {
   );
 }
 
+export function uniqueBetaModels(records) {
+  const models = new Set();
+  for (const record of records) {
+    for (const model of modelParts(record.productModel)) {
+      models.add(model);
+    }
+  }
+  return [...models].sort((a, b) => a.localeCompare(b));
+}
+
+export function uniqueBetaVersions(records, model = "all") {
+  const requestedModel = normalizedModel(model);
+  return [
+    ...new Set(
+      records
+        .filter((record) => {
+          if (!model || model === "all") return true;
+          return modelParts(record.productModel).some((part) => normalizedModel(part) === requestedModel);
+        })
+        .map((record) => clean(record.version))
+        .filter(Boolean),
+    ),
+  ].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+}
+
 export function filterFeedback(records, filters) {
   const model = clean(filters.model);
   const search = clean(filters.search).toLowerCase();
@@ -314,6 +403,69 @@ export function filterFirmware(releases, filters) {
   });
 }
 
+export function filterBetaTests(records, filters) {
+  const model = clean(filters.model);
+  const version = clean(filters.version);
+  const testType = clean(filters.testType);
+  const testerType = clean(filters.testerType);
+  const status = clean(filters.status);
+  const priority = clean(filters.priority);
+  const search = clean(filters.search).toLowerCase();
+  const dateFrom = dateKey(filters.dateFrom);
+  const dateTo = dateKey(filters.dateTo);
+  const requestedModel = normalizedModel(model);
+
+  return records.filter((record) => {
+    const recordDate = dateKey(record.date);
+    const modelMatch =
+      !model ||
+      model === "all" ||
+      normalizedModel(record.productModel) === requestedModel ||
+      modelParts(record.productModel).some((part) => normalizedModel(part) === requestedModel);
+    const versionMatch = !version || version === "all" || record.version === version;
+    const testTypeMatch = !testType || record.testType === testType;
+    const testerTypeMatch = !testerType || record.testerType === testerType;
+    const statusMatch = !status || record.status === status;
+    const priorityMatch = !priority || record.priority === priority;
+    const dateFromMatch = !dateFrom || (recordDate && recordDate >= dateFrom);
+    const dateToMatch = !dateTo || (recordDate && recordDate <= dateTo);
+    const haystack = [
+      record.productModel,
+      record.version,
+      record.testType,
+      record.testerType,
+      record.testerOwner,
+      record.issueSource,
+      record.testItem,
+      record.issueFound,
+      record.severity,
+      record.priority,
+      record.status,
+      record.assignedTo,
+      record.engineeringResponse,
+      record.nextAction,
+      record.relatedRequestNumber,
+      record.relatedFirmwareVersion,
+      record.notes,
+      record.rawInput,
+    ]
+      .join("\n")
+      .toLowerCase();
+    const searchMatch = !search || haystack.includes(search);
+    return (
+      modelMatch &&
+      versionMatch &&
+      testTypeMatch &&
+      testerTypeMatch &&
+      statusMatch &&
+      priorityMatch &&
+      dateFromMatch &&
+      dateToMatch &&
+      searchMatch
+    );
+  });
+}
+
 export function summarizeFeedback(records) {
   const statusCounts = {
     todo: 0,
@@ -374,6 +526,166 @@ export function summarizeFirmware(releases) {
     total: releases.length,
     modelCount: uniqueFirmwareModels(releases).length,
     closedRequestCount: closedRequests.size,
+  };
+}
+
+export function summarizeBetaTests(records) {
+  const openStatuses = new Set(["Open", "Need Review", "Reproducing", "In Progress"]);
+  const resolvedStatuses = new Set(["Resolved", "Closed", "Fixed"]);
+  const highSeverity = new Set(["Critical", "High"]);
+  return {
+    total: records.length,
+    open: records.filter((record) => openStatuses.has(record.status)).length,
+    inProgress: records.filter((record) => record.status === "In Progress").length,
+    resolved: records.filter((record) => resolvedStatuses.has(record.status)).length,
+    highSeverity: records.filter((record) => highSeverity.has(record.severity)).length,
+    userTestIssues: records.filter((record) => /user|beta|koc/i.test(record.testerType || record.issueSource)).length,
+  };
+}
+
+function firstMeaningfulLine(text) {
+  return (
+    clean(text)
+      .split(/\n+/)
+      .map((line) => clean(line).replace(/^[-*•\d.)、\s]+/, ""))
+      .find(Boolean) || ""
+  );
+}
+
+function formatInputDate(year, month, day) {
+  const normalizedYear = year.length === 2 ? `20${year}` : year;
+  return `${normalizedYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function normalizeDateMatch(match) {
+  if (!match) return "";
+  return formatInputDate(match[1], match[2], match[3]);
+}
+
+function dateLinePattern() {
+  return /^(?:date\s*[:：]\s*)?(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s*$/i;
+}
+
+function dateAnywherePattern() {
+  return /(\d{4})[/-](\d{1,2})[/-](\d{1,2})/;
+}
+
+function isLikelyPersonName(value) {
+  const text = clean(value);
+  if (!text || text.length > 60) return false;
+  if (/[：:，,.;!?]/.test(text)) return false;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length < 2 || words.length > 4) return false;
+  return words.every((word) => /^[A-Z][A-Za-z'’-]+$/.test(word));
+}
+
+function parseInputLead(input) {
+  const lines = clean(input)
+    .split(/\n+/)
+    .map((line) => clean(line))
+    .filter(Boolean);
+  let date = "";
+  let testerOwner = "";
+  const issueLines = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const testerField = line.match(/^(?:tester|owner|user|from)\s*[:：]\s*(.+)$/i);
+    if (testerField) {
+      testerOwner ||= clean(testerField[1]);
+      continue;
+    }
+
+    const dateField = line.match(dateLinePattern());
+    if (dateField) {
+      date ||= normalizeDateMatch(dateField);
+      continue;
+    }
+
+    const leadDate = line.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(.+)$/);
+    if (leadDate) {
+      date ||= normalizeDateMatch(leadDate);
+      const rest = clean(leadDate[4]);
+      if (isLikelyPersonName(rest) && index === 0 && lines.length > 1) {
+        testerOwner ||= rest;
+        continue;
+      }
+      issueLines.push(rest);
+      continue;
+    }
+
+    const inlineDate = line.match(dateAnywherePattern());
+    if (inlineDate && !date) {
+      date = normalizeDateMatch(inlineDate);
+    }
+
+    if (!testerOwner && isLikelyPersonName(line)) {
+      const isSignature = index === lines.length - 1 || dateLinePattern().test(lines[index + 1] || "");
+      if (isSignature) {
+        testerOwner = line;
+        continue;
+      }
+    }
+
+    issueLines.push(line);
+  }
+
+  return {
+    issueFound: issueLines.join("\n") || firstMeaningfulLine(input),
+    date,
+    testerOwner,
+  };
+}
+
+function inferKeyPoint(issueFound) {
+  const text = clean(issueFound);
+  if (!text) return "";
+  if (/lost.*usps|usps.*lost|package.*lost|lost.*package/i.test(text)) {
+    return "Package appears lost in USPS system and may arrive very late.";
+  }
+  if (/(crash|reboot|freeze|卡死|死机|重启)/i.test(text)) {
+    return "Stability issue during testing; confirm reproduction steps and affected version.";
+  }
+  if (/(no audio|weak audio|microphone|modulation|没有声音|调制|麦克风)/i.test(text)) {
+    return "Audio or modulation issue; verify microphone gain, TX audio path, and firmware version.";
+  }
+  if (/(aprs|gnss|packet|位置|定位)/i.test(text)) {
+    return "APRS/GNSS behavior needs validation against expected firmware settings.";
+  }
+  return text.split(/\n+/).map((line) => clean(line)).find(Boolean) || "";
+}
+
+export function inferBetaDraft(input) {
+  const rawInput = clean(input);
+  const lower = rawInput.toLowerCase();
+  const parsedInput = parseInputLead(rawInput);
+  const issueFound = parsedInput.issueFound;
+  let severity = "Medium";
+  if (/(crash|reboot|brick|cannot power|dead|freeze|卡死|死机|重启|无法开机|变砖)/i.test(rawInput)) {
+    severity = "Critical";
+  } else if (/(fail|cannot|no audio|no tx|no rx|wrong|严重|失败|无法|没有声音|不能发射|不能接收)/i.test(rawInput)) {
+    severity = "High";
+  } else if (/(minor|typo|display|ui|小问题|显示|文案)/i.test(rawInput)) {
+    severity = "Low";
+  }
+
+  const priority = severity === "Critical" ? "P0" : severity === "High" ? "P1" : "P2";
+  const status = lower.includes("fixed") || lower.includes("resolved") || /已修复|已解决/.test(rawInput) ? "Resolved" : "Open";
+  const nextAction =
+    status === "Resolved"
+      ? "Verify fix in the next test round."
+      : "Reproduce the issue, confirm affected version, and assign engineering owner.";
+
+  return {
+    issueFound,
+    keyPoint: inferKeyPoint(issueFound),
+    date: parsedInput.date,
+    testerOwner: parsedInput.testerOwner,
+    severity,
+    priority,
+    status,
+    nextAction,
+    rawInput,
   };
 }
 

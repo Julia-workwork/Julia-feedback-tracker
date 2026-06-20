@@ -1,5 +1,7 @@
 import {
   BETA_TEST_HEADERS,
+  betaDetailHeading,
+  betaDetailLabel,
   STATUS_LABELS,
   buildFirmwareLookup,
   categoryClass,
@@ -21,7 +23,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-beta-admin-collapse";
+} from "./lib/domain.mjs?v=20260620-beta-follow-up";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -134,6 +136,7 @@ const elements = {
   betaInputModel: document.querySelector("#beta-input-model"),
   betaInputVersion: document.querySelector("#beta-input-version"),
   betaInputTestType: document.querySelector("#beta-input-test-type"),
+  betaInputTestItem: document.querySelector("#beta-input-test-item"),
   betaInputTesterType: document.querySelector("#beta-input-tester-type"),
   betaInputTesterOwner: document.querySelector("#beta-input-tester-owner"),
   betaInputIssueFound: document.querySelector("#beta-input-issue-found"),
@@ -619,6 +622,13 @@ function betaRecordTemplate(record, index) {
 }
 
 function openBetaDetail(record) {
+  const processFollowUpRow = isAdmin()
+    ? editableDetailRow(
+        betaDetailLabel("Notes"),
+        `<textarea name="Notes" rows="5">${escapeHtml(record.notes)}</textarea>`,
+        "wide",
+      )
+    : detailRow(betaDetailLabel("Notes"), record.notes);
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
@@ -629,6 +639,7 @@ function openBetaDetail(record) {
           ${record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : ""}
           ${record.status ? `<span class="status-pill">${escapeHtml(record.status)}</span>` : ""}
         </div>
+        <p class="beta-detail-heading">${escapeHtml(betaDetailHeading(record) || "Beta test detail")}</p>
         <h2>${escapeHtml(record.issueFound || "Beta test detail")}</h2>
       </div>
       <div class="detail-actions">
@@ -656,10 +667,34 @@ function openBetaDetail(record) {
       ${detailRow("Resolved Date", record.resolvedDate)}
       ${detailRow("Related Request Number", record.relatedRequestNumber)}
       ${detailRow("Related Firmware Version", record.relatedFirmwareVersion)}
-      ${detailRow("Notes", record.notes)}
+      ${processFollowUpRow}
       ${detailRow("Raw Input", record.rawInput)}
     </dl>
+    ${isAdmin() ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
   `;
+  elements.detail.querySelector(".beta-save-follow-up")?.addEventListener("click", async () => {
+    if (!isAdmin()) {
+      showToast("Only Admin can edit beta follow-up.");
+      return;
+    }
+    const notes = elements.detail.querySelector('[name="Notes"]')?.value.trim() || "";
+    if ((record.notes || "") === notes) {
+      showToast("No changes to save");
+      return;
+    }
+    setDetailSaving(true);
+    try {
+      await syncBetaFollowUp(record, notes);
+      record.notes = notes;
+      renderBeta();
+      openBetaDetail(record);
+      showToast("Process follow-up saved");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Update failed");
+    } finally {
+      setDetailSaving(false);
+    }
+  });
   document.querySelector("#close-detail").addEventListener("click", () => {
     elements.detail.classList.add("is-hidden");
     document.body.classList.remove("detail-open");
@@ -794,6 +829,18 @@ function recordMatchPayload(record) {
   };
 }
 
+function betaRecordMatchPayload(record) {
+  return {
+    rowNumber: record.rowNumber,
+    date: record.date,
+    productModel: record.productModel,
+    version: record.version,
+    testerOwner: record.testerOwner,
+    issueFound: record.issueFound,
+    rawInput: record.rawInput,
+  };
+}
+
 function callGoogleAppsScript(params) {
   return new Promise((resolve, reject) => {
     if (!GOOGLE_APPS_SCRIPT_URL) {
@@ -858,10 +905,10 @@ function betaPayloadFromInput() {
     "Product Model": elements.betaInputModel.value.trim(),
     Version: elements.betaInputVersion.value.trim(),
     "Test Type": elements.betaInputTestType.value.trim(),
+    "Test Item": elements.betaInputTestItem.value.trim(),
     "Tester Type": elements.betaInputTesterType.value.trim(),
     "Tester / Owner": elements.betaInputTesterOwner.value.trim(),
     "Issue Source": elements.betaInputTesterType.value.trim(),
-    "Test Item": "",
     "Issue Found": elements.betaInputIssueFound.value.trim(),
     "Key Point": elements.betaInputKeyPoint.value.trim(),
     Severity: elements.betaInputSeverity.value.trim(),
@@ -887,6 +934,18 @@ function syncBetaTestRecord(record) {
   }).then((payload) => {
     if (payload?.ok) return payload;
     throw new Error(payload?.message || "Save failed.");
+  });
+}
+
+function syncBetaFollowUp(record, notes) {
+  return callGoogleAppsScript({
+    action: "updateBetaTestRecord",
+    authToken: state.auth?.token || "",
+    match: JSON.stringify(betaRecordMatchPayload(record)),
+    changes: JSON.stringify({ Notes: notes }),
+  }).then((payload) => {
+    if (payload?.ok) return payload;
+    throw new Error(payload?.message || "Update failed.");
   });
 }
 
@@ -947,8 +1006,8 @@ async function saveBetaInput() {
   setBetaInputMessage("Saving beta test record...");
   try {
     await verifyEditPermission();
-    await syncBetaTestRecord(record);
-    state.betaRecords.unshift(normalizeBetaRow(record));
+    const result = await syncBetaTestRecord(record);
+    state.betaRecords.unshift(normalizeBetaRow({ ...record, __rowNumber: result.row || "" }));
     renderBetaFilterOptions();
     renderBeta();
     clearBetaInput();
