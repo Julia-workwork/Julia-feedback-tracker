@@ -23,7 +23,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-beta-editable-card";
+} from "./lib/domain.mjs?v=20260620-beta-item-before-type";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -665,8 +665,9 @@ function openBetaDetail(record) {
     </div>
     <dl class="detail-list">
       ${detailRow("Date", record.date)}
-      ${betaEditableRow(record, "Product Model", record.productModel, inputTemplate("Product Model", record.productModel))}
+      ${detailRow("Product Model", record.productModel)}
       ${betaEditableRow(record, "Version", record.version, inputTemplate("Version", record.version))}
+      ${betaEditableRow(record, "Test Item", record.testItem, inputTemplate("Test Item", record.testItem))}
       ${betaEditableRow(
         record,
         "Test Type",
@@ -680,8 +681,12 @@ function openBetaDetail(record) {
         betaSelectTemplate("Tester Type", record.testerType, ["", "Internal Test", "User Beta Test", "Engineer Test", "KOC Test"]),
       )}
       ${detailRow("Tester / Owner", record.testerOwner)}
-      ${betaEditableRow(record, "Issue Source", record.issueSource, inputTemplate("Issue Source", record.issueSource))}
-      ${betaEditableRow(record, "Test Item", record.testItem, inputTemplate("Test Item", record.testItem))}
+      ${betaEditableRow(
+        record,
+        "Issue Source",
+        record.issueSource,
+        betaSelectTemplate("Issue Source", record.issueSource, ["", "Internal Test", "User Beta Test", "Engineer Test", "KOC Test", "User Feedback", "Internal QA"]),
+      )}
       ${betaEditableRow(record, "Issue Found", record.issueFound, textareaTemplate("Issue Found", record.issueFound, 4), "wide")}
       ${betaEditableRow(record, "Key Point", record.keyPoint, textareaTemplate("Key Point", record.keyPoint, 3), "wide")}
       ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, ["", "Critical", "High", "Medium", "Low"]), "short")}
@@ -1176,12 +1181,11 @@ function changedFields(record) {
 }
 
 const BETA_FIELD_TO_RECORD_KEY = {
-  "Product Model": "productModel",
   Version: "version",
+  "Test Item": "testItem",
   "Test Type": "testType",
   "Tester Type": "testerType",
   "Issue Source": "issueSource",
-  "Test Item": "testItem",
   "Issue Found": "issueFound",
   "Key Point": "keyPoint",
   Severity: "severity",
