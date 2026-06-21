@@ -2271,7 +2271,11 @@ elements.loginForm.addEventListener("submit", async (event) => {
     saveAuth(auth);
     elements.loginPassword.value = "";
     showDashboard();
-    await load();
+    try {
+      await load();
+    } catch (loadError) {
+      setMessage(loadError instanceof Error ? loadError.message : "Unknown loading error", true);
+    }
   } catch (error) {
     clearAuth();
     showLogin();
@@ -2307,6 +2311,7 @@ async function initAuth() {
   if (!saved?.token) return;
 
   setLoginMessage("Checking saved session...");
+  let restored = false;
   try {
     const auth = await verifySession(saved);
     if (!auth) {
@@ -2317,11 +2322,17 @@ async function initAuth() {
     saveAuth(auth);
     setLoginMessage("");
     showDashboard();
-    await load();
+    restored = true;
   } catch {
     clearAuth();
     setLoginMessage("");
     showLogin();
+  }
+  if (!restored) return;
+  try {
+    await load();
+  } catch (loadError) {
+    setMessage(loadError instanceof Error ? loadError.message : "Unknown loading error", true);
   }
 }
 
