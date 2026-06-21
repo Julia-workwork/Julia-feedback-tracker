@@ -1,5 +1,7 @@
 import {
   BETA_TEST_HEADERS,
+  betaDetailHeading,
+  betaDetailLabel,
   STATUS_LABELS,
   buildFirmwareLookup,
   categoryClass,
@@ -8,6 +10,9 @@ import {
   filterFirmware,
   inferBetaDraft,
   isFirmwareReleaseLikeFeedbackRow,
+  canEditModule,
+  canViewModule,
+  normalizePermissions,
   normalizeBetaRow,
   normalizeFirmwareRow,
   normalizeRequestNumber,
@@ -21,7 +26,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260620-beta-keypoint";
+} from "./lib/domain.mjs?v=20260621-module-permissions";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -57,7 +62,23 @@ const EXPECTED_SHEET_HEADERS = new Set([
   ...BETA_TEST_HEADERS,
 ]);
 const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
-const EDIT_ROLES = new Set(["Admin", "Editor"]);
+const HERO_COPY = {
+  feedback: {
+    eyebrow: "Julia's Feedback Tracker",
+    title: "Engineering Follow-up Dashboard",
+    note: "Private internal tool owned by Julia. Personal workflow only.",
+  },
+  firmware: {
+    eyebrow: "Firmware Change Log",
+    title: "Release History Dashboard",
+    note: "Track firmware versions, resolved requests, and release-level engineering changes.",
+  },
+  beta: {
+    eyebrow: "Beta Test Progress",
+    title: "Test Progress Dashboard",
+    note: "Review daily beta findings, user test issues, owners, and follow-up progress.",
+  },
+};
 
 const state = {
   records: [],
@@ -107,13 +128,40 @@ const elements = {
   feedbackView: document.querySelector("#feedback-view"),
   firmwareView: document.querySelector("#firmware-view"),
   betaView: document.querySelector("#beta-view"),
+  heroEyebrow: document.querySelector("#hero-eyebrow"),
+  heroTitle: document.querySelector("#hero-title"),
+  heroNote: document.querySelector("#hero-note"),
   model: document.querySelector("#model-filter"),
   search: document.querySelector("#search-filter"),
   category: document.querySelector("#category-filter"),
   priority: document.querySelector("#priority-filter"),
   dateFrom: document.querySelector("#date-from-filter"),
   dateTo: document.querySelector("#date-to-filter"),
+  filterMore: document.querySelector("#filter-more-toggle"),
   refresh: document.querySelector("#refresh-button"),
+  feedbackAdd: document.querySelector("#feedback-add-button"),
+  feedbackClose: document.querySelector("#feedback-close-button"),
+  feedbackInputPanel: document.querySelector("#feedback-input-panel"),
+  feedbackInputForm: document.querySelector("#feedback-input-form"),
+  feedbackGeneratedFields: document.querySelector("#feedback-generated-fields"),
+  feedbackRawInput: document.querySelector("#feedback-raw-input"),
+  feedbackInputDate: document.querySelector("#feedback-input-date"),
+  feedbackInputModel: document.querySelector("#feedback-input-model"),
+  feedbackInputId: document.querySelector("#feedback-input-id"),
+  feedbackInputEmail: document.querySelector("#feedback-input-email"),
+  feedbackInputCategory: document.querySelector("#feedback-input-category"),
+  feedbackInputPriority: document.querySelector("#feedback-input-priority"),
+  feedbackInputRequest: document.querySelector("#feedback-input-request"),
+  feedbackInputChannel: document.querySelector("#feedback-input-channel"),
+  feedbackInputStatus: document.querySelector("#feedback-input-status"),
+  feedbackInputKeyPoints: document.querySelector("#feedback-input-key-points"),
+  feedbackInputUpgrade: document.querySelector("#feedback-input-upgrade"),
+  feedbackInputChinese: document.querySelector("#feedback-input-chinese"),
+  feedbackInputNotes: document.querySelector("#feedback-input-notes"),
+  feedbackAnalyze: document.querySelector("#feedback-analyze-button"),
+  feedbackSave: document.querySelector("#feedback-save-button"),
+  feedbackClear: document.querySelector("#feedback-clear-button"),
+  feedbackInputMessage: document.querySelector("#feedback-input-message"),
   message: document.querySelector("#state-message"),
   summary: document.querySelector("#summary"),
   board: document.querySelector("#board"),
@@ -127,12 +175,14 @@ const elements = {
   firmwareSummary: document.querySelector("#firmware-summary"),
   firmwareMessage: document.querySelector("#firmware-message"),
   firmwareList: document.querySelector("#firmware-list"),
+  betaInputPanel: document.querySelector("#beta-input-panel"),
   betaInputForm: document.querySelector("#beta-input-form"),
   betaRawInput: document.querySelector("#beta-raw-input"),
   betaInputDate: document.querySelector("#beta-input-date"),
   betaInputModel: document.querySelector("#beta-input-model"),
   betaInputVersion: document.querySelector("#beta-input-version"),
   betaInputTestType: document.querySelector("#beta-input-test-type"),
+  betaInputTestItem: document.querySelector("#beta-input-test-item"),
   betaInputTesterType: document.querySelector("#beta-input-tester-type"),
   betaInputTesterOwner: document.querySelector("#beta-input-tester-owner"),
   betaInputIssueFound: document.querySelector("#beta-input-issue-found"),
@@ -187,13 +237,60 @@ function setBetaMessage(text, isError = false) {
 }
 
 function setBetaInputMessage(text, isError = false) {
+  if (!elements.betaInputMessage) return;
   elements.betaInputMessage.textContent = text;
   elements.betaInputMessage.classList.toggle("state-message--error", isError);
   elements.betaInputMessage.classList.toggle("is-hidden", !text);
 }
 
-function canEdit() {
-  return EDIT_ROLES.has(state.auth?.role);
+function setFeedbackInputMessage(text, isError = false) {
+  if (!elements.feedbackInputMessage) return;
+  elements.feedbackInputMessage.textContent = text;
+  elements.feedbackInputMessage.classList.toggle("state-message--error", isError);
+  elements.feedbackInputMessage.classList.toggle("is-hidden", !text);
+}
+
+function canView(module) {
+  return canViewModule(state.auth, module);
+}
+
+function canEdit(module = "feedback") {
+  return canEditModule(state.auth, module);
+}
+
+function isAdmin() {
+  return String(state.auth?.role || "").trim() === "Admin";
+}
+
+function updateBetaInputAccess() {
+  if (!elements.betaInputPanel || !elements.betaInputForm) return;
+  const allowed = canEdit("beta");
+  elements.betaInputPanel.hidden = !allowed;
+  if (!allowed) {
+    elements.betaInputPanel.removeAttribute("open");
+    setBetaInputMessage("");
+  }
+  elements.betaInputForm
+    .querySelectorAll("input, select, textarea, button")
+    .forEach((control) => {
+      control.disabled = !allowed;
+    });
+}
+
+function updateFeedbackInputAccess() {
+  if (!elements.feedbackAdd || !elements.feedbackInputPanel || !elements.feedbackInputForm) return;
+  const allowed = canEdit("feedback");
+  elements.feedbackAdd.hidden = !allowed;
+  elements.feedbackInputPanel.hidden = !allowed;
+  if (!allowed) {
+    elements.feedbackInputPanel.classList.add("is-hidden");
+    setFeedbackInputMessage("");
+  }
+  elements.feedbackInputForm
+    .querySelectorAll("input, select, textarea, button")
+    .forEach((control) => {
+      control.disabled = !allowed;
+    });
 }
 
 function setLoginMessage(text, isError = false) {
@@ -202,8 +299,8 @@ function setLoginMessage(text, isError = false) {
 }
 
 function saveAuth(auth) {
-  state.auth = auth;
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  state.auth = normalizePermissions(auth);
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state.auth));
 }
 
 function clearAuth() {
@@ -216,10 +313,28 @@ function showLogin() {
   elements.appShell.classList.add("is-hidden");
 }
 
+function firstAllowedView() {
+  return normalizePermissions(state.auth).views[0] || "feedback";
+}
+
+function updateViewAccess() {
+  elements.viewTabs.forEach((button) => {
+    const view = button.dataset.view;
+    button.hidden = !canView(view);
+  });
+  if (!canView(state.activeView)) {
+    state.activeView = firstAllowedView();
+  }
+}
+
 function showDashboard() {
   elements.loginScreen.classList.add("is-hidden");
   elements.appShell.classList.remove("is-hidden");
   elements.authRole.textContent = `${state.auth?.role || "Viewer"} · ${state.auth?.username || ""}`;
+  updateViewAccess();
+  updateFeedbackInputAccess();
+  updateBetaInputAccess();
+  setActiveView(state.activeView);
 }
 
 async function credentialHash(username, password) {
@@ -246,6 +361,8 @@ async function login(username, password) {
     token: payload.token,
     username: payload.username,
     role: payload.role,
+    edits: payload.edits,
+    views: payload.views,
     expiresAt: payload.expiresAt,
   };
 }
@@ -261,6 +378,8 @@ async function verifySession(auth) {
     token: auth.token,
     username: payload.username,
     role: payload.role,
+    edits: payload.edits,
+    views: payload.views,
     expiresAt: payload.expiresAt,
   };
 }
@@ -519,14 +638,14 @@ function firmwareCardTemplate(release, index) {
           <div class="closed-requests-header">
             <h3>Closed Requests</h3>
             ${
-              canEdit()
+              canEdit("firmware")
                 ? `<button class="edit-closed-requests" type="button" data-release-index="${index}">Edit</button>`
                 : ""
             }
           </div>
           <div class="closed-request-list">${closedRequests}</div>
           ${
-            canEdit()
+            canEdit("firmware")
               ? `
                 <form class="closed-request-editor is-hidden" data-release-index="${index}">
                   <label>
@@ -585,17 +704,39 @@ function betaRecordTemplate(record, index) {
     <article class="beta-card" data-beta-index="${index}" role="button" tabindex="0">
       <div>
         <p>${escapeHtml(record.productModel || "-")}</p>
-        <h3>${escapeHtml(record.issueFound || record.rawInput || "No issue summary")}</h3>
+        <h3>${escapeHtml(record.keyPoint || record.issueFound || record.rawInput || "No key point")}</h3>
       </div>
       <div class="beta-card-meta">
         <span>${escapeHtml(record.version || "-")}</span>
+        <span>${escapeHtml(record.testItem || "-")}</span>
         <span>${escapeHtml(record.testType || "-")}</span>
-        <span>${escapeHtml(record.testerOwner || "-")}</span>
       </div>
       <div class="beta-card-chips">${chips}</div>
       <p class="beta-next-action">${escapeHtml(record.nextAction || record.notes || "-")}</p>
     </article>
   `;
+}
+
+function inputTemplate(name, value, type = "text") {
+  return `<input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value)}" />`;
+}
+
+function textareaTemplate(name, value, rows = 4) {
+  return `<textarea name="${escapeHtml(name)}" rows="${rows}">${escapeHtml(value)}</textarea>`;
+}
+
+function betaSelectTemplate(name, value, options) {
+  return `
+    <select name="${escapeHtml(name)}">
+      ${options
+        .map((option) => `<option value="${escapeHtml(option)}"${option === value ? " selected" : ""}>${escapeHtml(option || "-")}</option>`)
+        .join("")}
+    </select>
+  `;
+}
+
+function betaEditableRow(record, header, value, fieldHtml, size = "medium") {
+  return canEdit("beta") ? editableDetailRow(betaDetailLabel(header), fieldHtml, size) : detailRow(betaDetailLabel(header), value);
 }
 
 function openBetaDetail(record) {
@@ -609,6 +750,7 @@ function openBetaDetail(record) {
           ${record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : ""}
           ${record.status ? `<span class="status-pill">${escapeHtml(record.status)}</span>` : ""}
         </div>
+        <p class="beta-detail-heading">${escapeHtml(betaDetailHeading(record) || "Beta test detail")}</p>
         <h2>${escapeHtml(record.issueFound || "Beta test detail")}</h2>
       </div>
       <div class="detail-actions">
@@ -618,28 +760,73 @@ function openBetaDetail(record) {
     <dl class="detail-list">
       ${detailRow("Date", record.date)}
       ${detailRow("Product Model", record.productModel)}
-      ${detailRow("Version", record.version)}
-      ${detailRow("Test Type", record.testType)}
-      ${detailRow("Tester Type", record.testerType)}
+      ${betaEditableRow(record, "Version", record.version, inputTemplate("Version", record.version))}
+      ${betaEditableRow(record, "Test Item", record.testItem, inputTemplate("Test Item", record.testItem))}
+      ${betaEditableRow(
+        record,
+        "Test Type",
+        record.testType,
+        betaSelectTemplate("Test Type", record.testType, ["", "Firmware Beta", "APP Beta", "CPS Beta", "Hardware Test", "Regression Test"]),
+      )}
+      ${betaEditableRow(
+        record,
+        "Tester Type",
+        record.testerType,
+        betaSelectTemplate("Tester Type", record.testerType, ["", "Internal Test", "User Beta Test", "Engineer Test", "KOC Test"]),
+      )}
       ${detailRow("Tester / Owner", record.testerOwner)}
-      ${detailRow("Issue Source", record.issueSource)}
-      ${detailRow("Test Item", record.testItem)}
-      ${detailRow("Issue Found", record.issueFound)}
-      ${detailRow("Key Point", record.keyPoint)}
-      ${detailRow("Severity", record.severity)}
-      ${detailRow("Priority", record.priority)}
-      ${detailRow("Status", record.status)}
-      ${detailRow("Assigned To", record.assignedTo)}
-      ${detailRow("Engineering Response", record.engineeringResponse)}
-      ${detailRow("Next Action", record.nextAction)}
-      ${detailRow("Target Date", record.targetDate)}
-      ${detailRow("Resolved Date", record.resolvedDate)}
-      ${detailRow("Related Request Number", record.relatedRequestNumber)}
-      ${detailRow("Related Firmware Version", record.relatedFirmwareVersion)}
-      ${detailRow("Notes", record.notes)}
-      ${detailRow("Raw Input", record.rawInput)}
+      ${betaEditableRow(
+        record,
+        "Issue Source",
+        record.issueSource,
+        betaSelectTemplate("Issue Source", record.issueSource, ["", "Internal Test", "User Beta Test", "Engineer Test", "KOC Test", "User Feedback", "Internal QA"]),
+      )}
+      ${betaEditableRow(record, "Issue Found", record.issueFound, textareaTemplate("Issue Found", record.issueFound, 4), "wide")}
+      ${betaEditableRow(record, "Key Point", record.keyPoint, textareaTemplate("Key Point", record.keyPoint, 3), "wide")}
+      ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, ["", "Critical", "High", "Medium", "Low"]), "short")}
+      ${betaEditableRow(record, "Priority", record.priority, betaSelectTemplate("Priority", record.priority, ["", "P0", "P1", "P2"]), "short")}
+      ${betaEditableRow(
+        record,
+        "Status",
+        record.status,
+        betaSelectTemplate("Status", record.status, ["", "Open", "Need Review", "Reproducing", "In Progress", "Resolved", "Closed"]),
+        "short",
+      )}
+      ${betaEditableRow(record, "Assigned To", record.assignedTo, inputTemplate("Assigned To", record.assignedTo))}
+      ${betaEditableRow(record, "Engineering Response", record.engineeringResponse, textareaTemplate("Engineering Response", record.engineeringResponse, 3), "wide")}
+      ${betaEditableRow(record, "Next Action", record.nextAction, textareaTemplate("Next Action", record.nextAction, 3), "wide")}
+      ${betaEditableRow(record, "Target Date", record.targetDate, inputTemplate("Target Date", record.targetDate, "date"), "short")}
+      ${betaEditableRow(record, "Resolved Date", record.resolvedDate, inputTemplate("Resolved Date", record.resolvedDate, "date"), "short")}
+      ${betaEditableRow(record, "Related Request Number", record.relatedRequestNumber, inputTemplate("Related Request Number", record.relatedRequestNumber))}
+      ${betaEditableRow(record, "Related Firmware Version", record.relatedFirmwareVersion, inputTemplate("Related Firmware Version", record.relatedFirmwareVersion))}
+      ${betaEditableRow(record, "Notes", record.notes, textareaTemplate("Notes", record.notes, 5), "wide")}
+      ${detailRow("Edit Log", record.editLog)}
     </dl>
+    ${canEdit("beta") ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
   `;
+  elements.detail.querySelector(".beta-save-follow-up")?.addEventListener("click", async () => {
+    if (!canEdit("beta")) {
+      showToast("You do not have permission to edit.");
+      return;
+    }
+    const changes = betaChangedFields(record);
+    if (!Object.keys(changes).length) {
+      showToast("No changes to save");
+      return;
+    }
+    setDetailSaving(true);
+    try {
+      const result = await syncBetaRecordChanges(record, changes);
+      applySavedBetaChanges(record, changes, result);
+      renderBeta();
+      openBetaDetail(record);
+      showToast("Changes saved");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Update failed");
+    } finally {
+      setDetailSaving(false);
+    }
+  });
   document.querySelector("#close-detail").addEventListener("click", () => {
     elements.detail.classList.add("is-hidden");
     document.body.classList.remove("detail-open");
@@ -774,6 +961,18 @@ function recordMatchPayload(record) {
   };
 }
 
+function betaRecordMatchPayload(record) {
+  return {
+    rowNumber: record.rowNumber,
+    date: record.date,
+    productModel: record.productModel,
+    version: record.version,
+    testerOwner: record.testerOwner,
+    issueFound: record.issueFound,
+    rawInput: record.rawInput,
+  };
+}
+
 function callGoogleAppsScript(params) {
   return new Promise((resolve, reject) => {
     if (!GOOGLE_APPS_SCRIPT_URL) {
@@ -809,10 +1008,14 @@ function callGoogleAppsScript(params) {
   });
 }
 
-async function verifyEditPermission() {
+async function verifyEditPermission(module = "feedback") {
+  if (!canEdit(module)) {
+    throw new Error("You do not have permission to edit this section.");
+  }
   const payload = await callGoogleAppsScript({
     action: "ping",
     authToken: state.auth?.token || "",
+    module,
   });
   if (!payload?.ok || !payload?.canEdit) {
     throw new Error("You do not have permission to edit.");
@@ -832,16 +1035,284 @@ function syncChangesToGoogleSheet(record, changes) {
     });
 }
 
+function feedbackPayloadFromInput() {
+  return {
+    Date: elements.feedbackInputDate.value.trim(),
+    Model: elements.feedbackInputModel.value.trim(),
+    ID: elements.feedbackInputId.value.trim(),
+    Email: elements.feedbackInputEmail.value.trim(),
+    Profile: "",
+    "Update Category": elements.feedbackInputCategory.value.trim(),
+    "Key Points": elements.feedbackInputKeyPoints.value.trim(),
+    "Upgrade requirements": elements.feedbackInputUpgrade.value.trim(),
+    Chinese: elements.feedbackInputChinese.value.trim(),
+    Notes: elements.feedbackInputNotes.value.trim(),
+    "Request number": elements.feedbackInputRequest.value.trim(),
+    ING: "",
+    Priority: elements.feedbackInputPriority.value.trim(),
+    DONE: "",
+    Channel: elements.feedbackInputChannel.value.trim(),
+    "Dashboard Status": elements.feedbackInputStatus.value.trim() || "To Submit",
+  };
+}
+
+function feedbackInputDateFromMatch(match) {
+  if (!match) return "";
+  const year = match[1].length === 2 ? `20${match[1]}` : match[1];
+  return `${year}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
+}
+
+function likelyFeedbackName(value) {
+  const text = String(value || "").trim();
+  if (!text || text.length > 60 || /[：:，,.;!?]/.test(text)) return false;
+  const words = text.split(/\s+/).filter(Boolean);
+  return words.length >= 2 && words.length <= 4 && words.every((word) => /^[A-Z][A-Za-z'’-]+$/.test(word));
+}
+
+function extractFeedbackModels(text) {
+  const knownModels = ["EZTALK65", "RA89R", "HA1UV", "HA1G", "HA2", "HD1", "HD2", "MA1", "M17", "H1", "A3"];
+  const nonModels = new Set(["APP", "CPS", "PTT", "QRP", "SDR", "DMR", "APRS", "GNSS", "USPS"]);
+  const seen = new Set();
+  const models = [];
+  const addModel = (value) => {
+    const model = String(value || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+    if (!model || seen.has(model) || nonModels.has(model) || /^V\d/i.test(model)) return;
+    if (knownModels.includes(model) || /^[A-Z]{1,8}\d[A-Z0-9-]*$/.test(model)) {
+      seen.add(model);
+      models.push(model);
+    }
+  };
+
+  const matches = String(text || "").match(/[A-Z]+[A-Z0-9]*(?:\/[A-Z0-9]+)?(?:-[A-Z0-9]+)?/gi) || [];
+  for (const match of matches) {
+    const slash = match.match(/^([A-Z]+\d+[A-Z0-9]*?)\/([A-Z][A-Z0-9]*)$/i);
+    if (slash) {
+      addModel(slash[1]);
+      const prefix = slash[1].match(/^([A-Z]+\d+)/i)?.[1] || "";
+      addModel(`${prefix}${slash[2]}`);
+      continue;
+    }
+    addModel(match);
+  }
+  return models;
+}
+
+function inferFeedbackCategory(text) {
+  if (/(love|great|good|excellent|thanks|喜欢|很好|不错)/i.test(text)) return "Positive review";
+  if (/(horrible|garbage|bad|waste|terrible|差|糟糕)/i.test(text)) return "Negative review";
+  if (/(crash|freeze|reboot|fail|cannot|doesn.?t work|no audio|weak|bug|issue|problem|无法|不能|失败|问题|卡死|重启)/i.test(text)) {
+    return "BUG";
+  }
+  if (/(add|need|want|wish|request|option|support|bring back|希望|增加|支持|功能)/i.test(text)) return "Feature Request";
+  if (/(improve|optimi[sz]e|better|enhance|优化|改进)/i.test(text)) return "Feature Enhancement";
+  return "";
+}
+
+function inferFeedbackPriority(text, category) {
+  if (/(brick|dead|cannot power|crash|reboot|no tx|no rx|no audio|无法开机|变砖|不能发射|不能接收)/i.test(text)) return "P1";
+  if (category === "BUG") return "P2";
+  return "P2";
+}
+
+function inferFeedbackKeyPoint(text, category) {
+  const clean = String(text || "").trim();
+  if (!clean) return "";
+  if (/(weak.*modulation|modulation.*weak|microphone|mic gain|麦克风|调制)/i.test(clean)) {
+    return "Weak TX modulation or microphone audio needs engineering verification.";
+  }
+  if (/(aprs|gnss|packet|位置|定位)/i.test(clean)) {
+    return "APRS/GNSS behavior or settings need validation against expected firmware behavior.";
+  }
+  if (/(usps|package|shipping|lost in.*system|物流|包裹)/i.test(clean)) {
+    return "User reports package/shipping issue; confirm whether this belongs to support follow-up.";
+  }
+  if (/(6m|six meter|50mhz|50 mhz)/i.test(clean)) {
+    return "User requests better 6m amateur radio equipment or antenna support.";
+  }
+  if (category === "Positive review") return "Positive product feedback; no engineering action unless paired with a request.";
+  if (category === "Negative review") return "Negative product feedback; identify concrete receiver, audio, or usability issue before engineering follow-up.";
+  return clean.split(/\n+/).map((line) => line.trim()).find(Boolean) || "";
+}
+
+function inferFeedbackDraft(input) {
+  const raw = String(input || "").trim();
+  const lines = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const issueLines = [];
+  let date = "";
+  let userId = "";
+  let email = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+  let requestNumber = raw.match(/rt\s*[\d-]+/i)?.[0]?.replace(/\s+/g, "").toUpperCase() || "";
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const fieldMatch = line.match(/^(?:user|from|name|tester|owner|id)\s*[:：]\s*(.+)$/i);
+    if (fieldMatch) {
+      userId ||= fieldMatch[1].trim();
+      continue;
+    }
+
+    const standaloneDate = line.match(/^(?:date\s*[:：]\s*)?(\d{4}|\d{2})[/-](\d{1,2})[/-](\d{1,2})$/i);
+    if (standaloneDate) {
+      date ||= feedbackInputDateFromMatch(standaloneDate);
+      continue;
+    }
+
+    const leadDate = line.match(/^(\d{4}|\d{2})[/-](\d{1,2})[/-](\d{1,2})\s+(.+)$/);
+    if (leadDate) {
+      date ||= feedbackInputDateFromMatch(leadDate);
+      let rest = leadDate[4].trim();
+      const namePrefix = rest.match(/^([A-Z][A-Za-z'’-]+(?:\s+[A-Z][A-Za-z'’-]+){1,3})(?:\s+(.+))?$/);
+      if (namePrefix && likelyFeedbackName(namePrefix[1])) {
+        userId ||= namePrefix[1];
+        rest = (namePrefix[2] || "").trim();
+      }
+      if (rest) issueLines.push(rest);
+      continue;
+    }
+
+    const inlineDate = line.match(/(\d{4}|\d{2})[/-](\d{1,2})[/-](\d{1,2})/);
+    if (inlineDate && !date) date = feedbackInputDateFromMatch(inlineDate);
+
+    if (!userId && likelyFeedbackName(line) && (index === lines.length - 1 || lines.length > 1)) {
+      userId = line;
+      continue;
+    }
+
+    if (line === email || line === requestNumber) continue;
+    issueLines.push(line);
+  }
+
+  const originalFeedback = issueLines.join("\n").trim() || raw;
+  const models = extractFeedbackModels(raw);
+  const channel = /whatsapp/i.test(raw)
+    ? "WhatsApp"
+    : /facebook|fb/i.test(raw)
+      ? "Facebook"
+      : /email|@/i.test(raw)
+        ? "Email"
+        : "";
+  const category = inferFeedbackCategory(originalFeedback);
+  return {
+    date,
+    model: models.join(", "),
+    userId,
+    email,
+    requestNumber,
+    channel,
+    category,
+    priority: inferFeedbackPriority(originalFeedback, category),
+    keyPoints: inferFeedbackKeyPoint(originalFeedback, category),
+    originalFeedback,
+  };
+}
+
+function analyzeFeedbackInput() {
+  if (!canEdit("feedback")) {
+    showToast("You do not have permission to analyze feedback input.");
+    return;
+  }
+  const rawInput = elements.feedbackRawInput.value.trim();
+  if (!rawInput) {
+    setFeedbackInputMessage("Paste Raw Input first.", true);
+    return;
+  }
+  const draft = inferFeedbackDraft(rawInput);
+  if (draft.date) elements.feedbackInputDate.value = draft.date;
+  if (draft.model && !elements.feedbackInputModel.value.trim()) elements.feedbackInputModel.value = draft.model;
+  if (draft.userId && !elements.feedbackInputId.value.trim()) elements.feedbackInputId.value = draft.userId;
+  if (draft.email && !elements.feedbackInputEmail.value.trim()) elements.feedbackInputEmail.value = draft.email;
+  if (draft.category && !elements.feedbackInputCategory.value.trim()) elements.feedbackInputCategory.value = draft.category;
+  if (draft.priority) elements.feedbackInputPriority.value = draft.priority;
+  if (draft.requestNumber && !elements.feedbackInputRequest.value.trim()) elements.feedbackInputRequest.value = draft.requestNumber;
+  if (draft.channel && !elements.feedbackInputChannel.value.trim()) elements.feedbackInputChannel.value = draft.channel;
+  if (draft.keyPoints && !elements.feedbackInputKeyPoints.value.trim()) elements.feedbackInputKeyPoints.value = draft.keyPoints;
+  elements.feedbackInputUpgrade.value = draft.originalFeedback;
+  elements.feedbackGeneratedFields.open = true;
+  setFeedbackInputMessage("Draft generated. Original Feedback keeps the user's original words.");
+}
+
+function syncFeedbackRecord(record) {
+  return callGoogleAppsScript({
+    action: "addFeedbackRecord",
+    authToken: state.auth?.token || "",
+    record: JSON.stringify(record),
+  }).then((payload) => {
+    if (payload?.ok) return payload;
+    throw new Error(payload?.message || "Save failed.");
+  });
+}
+
+function clearFeedbackInput() {
+  if (!canEdit("feedback")) {
+    showToast("You do not have permission to clear feedback input.");
+    return;
+  }
+  elements.feedbackInputForm.reset();
+  elements.feedbackInputPriority.value = "P2";
+  elements.feedbackInputStatus.value = "To Submit";
+  setFeedbackInputMessage("");
+}
+
+function toggleFeedbackInput(open) {
+  if (!canEdit("feedback")) {
+    showToast("You do not have permission to add feedback records.");
+    return;
+  }
+  elements.feedbackInputPanel.classList.toggle("is-hidden", !open);
+  elements.feedbackAdd.textContent = open ? "Close Add" : "+ Add Feedback";
+  if (open && !elements.feedbackInputDate.value) {
+    elements.feedbackInputDate.value = new Date().toISOString().slice(0, 10);
+  }
+}
+
+async function saveFeedbackInput() {
+  if (!canEdit("feedback")) {
+    setFeedbackInputMessage("You do not have permission to save feedback records.", true);
+    return;
+  }
+  if (!elements.feedbackInputKeyPoints.value.trim() && !elements.feedbackInputUpgrade.value.trim()) {
+    setFeedbackInputMessage("Key Points or Original Feedback is required.", true);
+    return;
+  }
+  if (!elements.feedbackInputDate.value.trim()) {
+    elements.feedbackInputDate.value = new Date().toISOString().slice(0, 10);
+  }
+
+  const record = feedbackPayloadFromInput();
+  elements.feedbackSave.disabled = true;
+  elements.feedbackSave.textContent = "Saving...";
+  setFeedbackInputMessage("Saving feedback record...");
+  try {
+    await verifyEditPermission("feedback");
+    const result = await syncFeedbackRecord(record);
+    const normalized = normalizeRow({
+      ...record,
+      "Last Modified At": result.lastModifiedAt || "",
+      "Last Modified By": result.lastModifiedBy || "",
+    });
+    state.records.unshift(normalized);
+    renderModelOptions();
+    render();
+    clearFeedbackInput();
+    setFeedbackInputMessage("Saved to Feedback Board.");
+  } catch (error) {
+    setFeedbackInputMessage(error instanceof Error ? error.message : "Save failed.", true);
+  } finally {
+    elements.feedbackSave.disabled = false;
+    elements.feedbackSave.textContent = "Save to Sheet";
+  }
+}
+
 function betaPayloadFromInput() {
   return {
     Date: elements.betaInputDate.value.trim(),
     "Product Model": elements.betaInputModel.value.trim(),
     Version: elements.betaInputVersion.value.trim(),
     "Test Type": elements.betaInputTestType.value.trim(),
+    "Test Item": elements.betaInputTestItem.value.trim(),
     "Tester Type": elements.betaInputTesterType.value.trim(),
     "Tester / Owner": elements.betaInputTesterOwner.value.trim(),
     "Issue Source": elements.betaInputTesterType.value.trim(),
-    "Test Item": "",
     "Issue Found": elements.betaInputIssueFound.value.trim(),
     "Key Point": elements.betaInputKeyPoint.value.trim(),
     Severity: elements.betaInputSeverity.value.trim(),
@@ -870,7 +1341,23 @@ function syncBetaTestRecord(record) {
   });
 }
 
+function syncBetaRecordChanges(record, changes) {
+  return callGoogleAppsScript({
+    action: "updateBetaTestRecord",
+    authToken: state.auth?.token || "",
+    match: JSON.stringify(betaRecordMatchPayload(record)),
+    changes: JSON.stringify(changes),
+  }).then((payload) => {
+    if (payload?.ok) return payload;
+    throw new Error(payload?.message || "Update failed.");
+  });
+}
+
 function analyzeBetaInput() {
+  if (!canEdit("beta")) {
+    showToast("You do not have permission to analyze beta input.");
+    return;
+  }
   const rawInput = elements.betaRawInput.value.trim();
   if (!rawInput) {
     setBetaInputMessage("Paste beta test content first.", true);
@@ -893,6 +1380,10 @@ function analyzeBetaInput() {
 }
 
 function clearBetaInput() {
+  if (!canEdit("beta")) {
+    showToast("You do not have permission to clear beta input.");
+    return;
+  }
   elements.betaInputForm.reset();
   elements.betaInputKeyPoint.value = "";
   elements.betaInputPriority.value = "P2";
@@ -902,8 +1393,8 @@ function clearBetaInput() {
 }
 
 async function saveBetaInput() {
-  if (!canEdit()) {
-    setBetaInputMessage("You do not have permission to save records.", true);
+  if (!canEdit("beta")) {
+    setBetaInputMessage("You do not have permission to save beta test records.", true);
     return;
   }
   if (!elements.betaRawInput.value.trim()) {
@@ -918,9 +1409,9 @@ async function saveBetaInput() {
   elements.betaSave.textContent = "Saving...";
   setBetaInputMessage("Saving beta test record...");
   try {
-    await verifyEditPermission();
-    await syncBetaTestRecord(record);
-    state.betaRecords.unshift(normalizeBetaRow(record));
+    await verifyEditPermission("beta");
+    const result = await syncBetaTestRecord(record);
+    state.betaRecords.unshift(normalizeBetaRow({ ...record, __rowNumber: result.row || "" }));
     renderBetaFilterOptions();
     renderBeta();
     clearBetaInput();
@@ -989,7 +1480,7 @@ function editableDetailRow(label, fieldHtml, size = "medium") {
 }
 
 function permissionAwareDetailRow(label, value, fieldHtml, size = "medium") {
-  return canEdit() ? editableDetailRow(label, fieldHtml, size) : detailRow(label, value);
+  return canEdit("feedback") ? editableDetailRow(label, fieldHtml, size) : detailRow(label, value);
 }
 
 function statusSelectTemplate(record) {
@@ -1053,6 +1544,54 @@ function changedFields(record) {
     }
     return changes;
   }, {});
+}
+
+const BETA_FIELD_TO_RECORD_KEY = {
+  Version: "version",
+  "Test Item": "testItem",
+  "Test Type": "testType",
+  "Tester Type": "testerType",
+  "Issue Source": "issueSource",
+  "Issue Found": "issueFound",
+  "Key Point": "keyPoint",
+  Severity: "severity",
+  Priority: "priority",
+  Status: "status",
+  "Assigned To": "assignedTo",
+  "Engineering Response": "engineeringResponse",
+  "Next Action": "nextAction",
+  "Target Date": "targetDate",
+  "Resolved Date": "resolvedDate",
+  "Related Request Number": "relatedRequestNumber",
+  "Related Firmware Version": "relatedFirmwareVersion",
+  Notes: "notes",
+};
+
+function betaOriginalEditableValues(record) {
+  return Object.entries(BETA_FIELD_TO_RECORD_KEY).reduce((values, [field, key]) => {
+    values[field] = record[key] || "";
+    return values;
+  }, {});
+}
+
+function betaChangedFields(record) {
+  const current = fieldValuesFromDetail();
+  const original = betaOriginalEditableValues(record);
+  return Object.entries(current).reduce((changes, [field, value]) => {
+    if (!Object.prototype.hasOwnProperty.call(original, field)) return changes;
+    if ((original[field] || "") !== value) {
+      changes[field] = value;
+    }
+    return changes;
+  }, {});
+}
+
+function applySavedBetaChanges(record, changes, result = {}) {
+  Object.entries(changes).forEach(([field, value]) => {
+    const key = BETA_FIELD_TO_RECORD_KEY[field];
+    if (key) record[key] = value;
+  });
+  if (result.editLog !== undefined) record.editLog = result.editLog;
 }
 
 function changesSummary(record, changes) {
@@ -1165,46 +1704,68 @@ function linkedFirmwareTemplate(record) {
   `;
 }
 
+function detailHeaderTagsTemplate(record) {
+  return `
+    <div class="detail-header-tags">
+      ${record.model ? `<span class="detail-tag detail-tag--model">${escapeHtml(record.model)}</span>` : ""}
+      ${categoryPillsTemplate(record)}
+      ${record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : ""}
+    </div>
+  `;
+}
+
+function detailSummaryTemplate(record) {
+  const meta = [record.requestNumber, record.date, record.id].filter(Boolean).join(" · ");
+  return `
+    <section class="detail-summary-card">
+      <div class="card-meta">
+        ${record.status ? `<span class="status-pill">${escapeHtml(STATUS_LABELS[record.status] || record.status)}</span>` : ""}
+        ${record.channel ? `<span class="category-pill category-unknown">${escapeHtml(record.channel)}</span>` : ""}
+      </div>
+      <h2>${escapeHtml(record.keyPoints || "Feedback detail")}</h2>
+      ${meta ? `<p>${escapeHtml(meta)}</p>` : ""}
+    </section>
+  `;
+}
+
 function openDetail(record) {
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
     <div class="detail-panel__header">
-      <div>
-        <div class="card-meta">${categoryPillsTemplate(record)}</div>
-        <h2>${escapeHtml(record.keyPoints || "Feedback detail")}</h2>
-      </div>
+      ${detailHeaderTagsTemplate(record)}
       <div class="detail-actions">
         <button class="copy-detail-summary" type="button">Copy Engineer Summary</button>
         <button type="button" id="close-detail">Close</button>
       </div>
     </div>
+    ${detailSummaryTemplate(record)}
     <dl class="detail-list">
       ${linkedFirmwareTemplate(record)}
+      ${detailRow("Original Feedback", record.upgradeRequirements)}
+      ${detailRow("Chinese", record.chinese)}
+      ${permissionAwareDetailRow("Status", STATUS_LABELS[record.status] || "-", statusSelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Priority", record.priority, prioritySelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Request number", record.requestNumber, `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
+      ${permissionAwareDetailRow("DONE", record.done, doneSelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("ING", record.ing, `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
+      ${permissionAwareDetailRow("Notes", record.notes, `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
+      ${modificationRowsTemplate(record)}
       ${detailRow("Model", record.model)}
       ${detailRow("User ID", record.id)}
       ${detailRow("Email", record.email)}
       ${detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
-      ${permissionAwareDetailRow("Status", STATUS_LABELS[record.status] || "-", statusSelectTemplate(record), "short")}
-      ${permissionAwareDetailRow("Priority", record.priority, prioritySelectTemplate(record), "short")}
-      ${permissionAwareDetailRow("Request number", record.requestNumber, `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
-      ${permissionAwareDetailRow("ING", record.ing, `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
-      ${permissionAwareDetailRow("DONE", record.done, doneSelectTemplate(record), "short")}
-      ${modificationRowsTemplate(record)}
-      ${detailRow("Upgrade requirements", record.upgradeRequirements)}
-      ${detailRow("Chinese", record.chinese)}
-      ${permissionAwareDetailRow("Notes", record.notes, `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
     </dl>
-    ${canEdit() ? `<button class="save-detail-changes" type="button">Save Changes</button>` : ""}
+    ${canEdit("feedback") ? `<button class="save-detail-changes" type="button">Save Changes</button>` : ""}
   `;
   document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
     await copyEngineerSummary(record);
     showToast("Engineer summary copied");
   });
   document.querySelector(".save-detail-changes")?.addEventListener("click", async () => {
-    if (!canEdit()) {
+    if (!canEdit("feedback")) {
       showToast("You do not have permission to edit.");
       return;
     }
@@ -1217,7 +1778,7 @@ function openDetail(record) {
     if (!confirmed) return;
     setDetailSaving(true);
     try {
-      await verifyEditPermission();
+      await verifyEditPermission("feedback");
       await saveRecordChanges(record, changes);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Update failed");
@@ -1316,33 +1877,44 @@ function recordsFromDetectedHeaderRow(tableRows) {
   return null;
 }
 
-function tableRowsToRecords(table) {
+function hasRequiredHeaders(headers, requiredHeaders) {
+  return requiredHeaders.every((header) => headers.includes(header));
+}
+
+function tableRowsToRecords(table, requiredHeaders = []) {
+  if (requiredHeaders.length) {
+    const detectedHeaderRecords = recordsFromDetectedHeaderRow(table.rows);
+    if (detectedHeaderRecords) {
+      return detectedHeaderRecords;
+    }
+  }
+
   const labels = table.cols.map((column) => canonicalSheetHeader(column.label));
   const ids = table.cols.map((column) => canonicalSheetHeader(column.id));
   const labelsHaveExpectedHeaders = headerScore(labels) > 0;
   const headers = labelsHaveExpectedHeaders ? labels : ids;
   const parsedRecords = buildRecordsFromHeaders(table.rows, headers);
 
-  if (headerScore(headers) > 0) {
+  if (headerScore(headers) > 0 && hasRequiredHeaders(headers, requiredHeaders)) {
     return parsedRecords;
   }
 
-  const detectedHeaderRecords = recordsFromDetectedHeaderRow(table.rows);
-  if (detectedHeaderRecords) {
-    return detectedHeaderRecords;
+  const fallbackHeaderRecords = recordsFromDetectedHeaderRow(table.rows);
+  if (fallbackHeaderRecords) {
+    return fallbackHeaderRecords;
   }
 
   throw new Error("Sheet header row was not detected. Please keep the field names row visible in the first 40 rows.");
 }
 
-function loadSheetRows({ gid = "", sheetName = "" }) {
+function loadSheetRows({ gid = "", sheetName = "", requiredHeaders = [] }) {
   return new Promise((resolve, reject) => {
     const callbackName = `handleSheet_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
     const query = new URLSearchParams({
       tq: "select *",
       tqx: `out:json;responseHandler:${callbackName}`,
-      headers: "1",
+      headers: requiredHeaders.length ? "0" : "1",
       cacheBust: String(Date.now()),
     });
     if (gid) query.set("gid", gid);
@@ -1358,7 +1930,7 @@ function loadSheetRows({ gid = "", sheetName = "" }) {
         return;
       }
 
-      resolve(tableRowsToRecords(payload.table));
+      resolve(tableRowsToRecords(payload.table, requiredHeaders));
     };
 
     script.addEventListener("error", () => {
@@ -1372,28 +1944,35 @@ function loadSheetRows({ gid = "", sheetName = "" }) {
 }
 
 function validateFirmwareRows(rows) {
+  if (!rows.length) return [];
   const headers = rows.length ? Object.keys(rows[0]) : [];
   return FIRMWARE_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
 }
 
 function validateBetaRows(rows) {
+  if (!rows.length) return [];
   const headers = rows.length ? Object.keys(rows[0]) : [];
   return BETA_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
 }
 
 async function loadFirmwareRecords() {
-  const rows = await loadSheetRows({ sheetName: FIRMWARE_SHEET_NAME });
-  const missing = validateFirmwareRows(rows);
-  if (missing.length) {
-    throw new Error(`Firmware Change Log is missing columns: ${missing.join(", ")}`);
-  }
-  return rows
+  const rows = await loadSheetRows({ sheetName: FIRMWARE_SHEET_NAME, requiredHeaders: FIRMWARE_REQUIRED_HEADERS });
+  const releases = rows
     .map(normalizeFirmwareRow)
     .filter((release) => release.date || release.model || release.version || release.changeLog);
+  const missing = validateFirmwareRows(rows);
+  if (missing.length && !releases.length) {
+    throw new Error(`Firmware Change Log is missing columns: ${missing.join(", ")}`);
+  }
+  return releases;
 }
 
 async function loadBetaRecords() {
-  const rows = await loadSheetRows({ sheetName: BETA_SHEET_NAME });
+  const payload = await callGoogleAppsScript({ action: "getBetaTestRecords" });
+  if (!payload?.ok) {
+    throw new Error(payload?.message || "Beta Test Progress is not available yet.");
+  }
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
   const missing = validateBetaRows(rows);
   if (missing.length) {
     throw new Error(`Beta Test Progress is missing columns: ${missing.join(", ")}`);
@@ -1404,9 +1983,9 @@ async function loadBetaRecords() {
 }
 
 async function load() {
-  setMessage("Loading feedback data...");
-  setFirmwareMessage("Loading firmware data...");
-  setBetaMessage("Loading beta test data...");
+  setMessage(canView("feedback") ? "Loading feedback data..." : "");
+  setFirmwareMessage(canView("firmware") ? "Loading firmware data..." : "");
+  setBetaMessage(canView("beta") ? "Loading beta test data..." : "");
   renderSummary([]);
   renderFirmwareSummary([]);
   renderBetaSummary([]);
@@ -1415,9 +1994,9 @@ async function load() {
   elements.betaList.innerHTML = "";
   try {
     const [feedbackRows, firmwareResult, betaResult] = await Promise.allSettled([
-      loadSheetRows({ gid: FEEDBACK_SHEET_GID }),
-      loadFirmwareRecords(),
-      loadBetaRecords(),
+      canView("feedback") ? loadSheetRows({ gid: FEEDBACK_SHEET_GID }) : Promise.resolve([]),
+      canView("firmware") ? loadFirmwareRecords() : Promise.resolve([]),
+      canView("beta") ? loadBetaRecords() : Promise.resolve([]),
     ]);
 
     if (feedbackRows.status !== "fulfilled") {
@@ -1464,7 +2043,14 @@ async function load() {
 }
 
 function setActiveView(view) {
+  if (!canView(view)) {
+    view = firstAllowedView();
+  }
   state.activeView = view;
+  const hero = HERO_COPY[view] || HERO_COPY.feedback;
+  if (elements.heroEyebrow) elements.heroEyebrow.textContent = hero.eyebrow;
+  if (elements.heroTitle) elements.heroTitle.textContent = hero.title;
+  if (elements.heroNote) elements.heroNote.textContent = hero.note;
   elements.viewTabs.forEach((button) => {
     const isActive = button.dataset.view === view;
     button.classList.toggle("is-active", isActive);
@@ -1476,7 +2062,10 @@ function setActiveView(view) {
 }
 
 elements.viewTabs.forEach((button) => {
-  button.addEventListener("click", () => setActiveView(button.dataset.view));
+  button.addEventListener("click", () => {
+    if (!canView(button.dataset.view)) return;
+    setActiveView(button.dataset.view);
+  });
 });
 elements.model.addEventListener("change", () => {
   state.filters.model = elements.model.value;
@@ -1524,6 +2113,17 @@ elements.firmwareDateTo.addEventListener("change", () => {
   renderFirmware();
 });
 elements.firmwareRefresh.addEventListener("click", load);
+elements.feedbackAdd.addEventListener("click", () => {
+  const isClosed = elements.feedbackInputPanel.classList.contains("is-hidden");
+  toggleFeedbackInput(isClosed);
+});
+elements.feedbackClose.addEventListener("click", () => toggleFeedbackInput(false));
+elements.feedbackAnalyze.addEventListener("click", analyzeFeedbackInput);
+elements.feedbackClear.addEventListener("click", clearFeedbackInput);
+elements.feedbackInputForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveFeedbackInput();
+});
 elements.betaModel.addEventListener("change", () => {
   state.betaFilters.model = elements.betaModel.value;
   renderBetaFilterOptions();
@@ -1607,7 +2207,7 @@ elements.firmwareList.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (!canEdit()) {
+  if (!canEdit("firmware")) {
     showToast("You do not have permission to edit.");
     return;
   }
@@ -1621,7 +2221,7 @@ elements.firmwareList.addEventListener("submit", async (event) => {
   }
 
   try {
-    await verifyEditPermission();
+    await verifyEditPermission("firmware");
     await syncFirmwareClosedRequests(release, nextValue);
     release.closedRequestsRaw = nextValue;
     release.closedRequests = parseClosedRequests(nextValue);
@@ -1637,6 +2237,12 @@ elements.firmwareList.addEventListener("submit", async (event) => {
   }
 });
 elements.refresh.addEventListener("click", load);
+elements.filterMore?.addEventListener("click", () => {
+  const filterBar = elements.filterMore.closest(".filter-bar");
+  const isExpanded = filterBar?.classList.toggle("is-expanded");
+  elements.filterMore.setAttribute("aria-expanded", String(Boolean(isExpanded)));
+  elements.filterMore.textContent = isExpanded ? "Hide Filters" : "More Filters";
+});
 elements.summary.addEventListener("click", (event) => {
   const button = event.target.closest("[data-summary-filter]");
   if (!button) return;
@@ -1665,7 +2271,11 @@ elements.loginForm.addEventListener("submit", async (event) => {
     saveAuth(auth);
     elements.loginPassword.value = "";
     showDashboard();
-    await load();
+    try {
+      await load();
+    } catch (loadError) {
+      setMessage(loadError instanceof Error ? loadError.message : "Unknown loading error", true);
+    }
   } catch (error) {
     clearAuth();
     showLogin();
@@ -1701,6 +2311,7 @@ async function initAuth() {
   if (!saved?.token) return;
 
   setLoginMessage("Checking saved session...");
+  let restored = false;
   try {
     const auth = await verifySession(saved);
     if (!auth) {
@@ -1711,11 +2322,17 @@ async function initAuth() {
     saveAuth(auth);
     setLoginMessage("");
     showDashboard();
-    await load();
+    restored = true;
   } catch {
     clearAuth();
     setLoginMessage("");
     showLogin();
+  }
+  if (!restored) return;
+  try {
+    await load();
+  } catch (loadError) {
+    setMessage(loadError instanceof Error ? loadError.message : "Unknown loading error", true);
   }
 }
 
