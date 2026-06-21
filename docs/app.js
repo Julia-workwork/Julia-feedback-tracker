@@ -678,7 +678,7 @@ function betaRecordTemplate(record, index) {
     <article class="beta-card" data-beta-index="${index}" role="button" tabindex="0">
       <div>
         <p>${escapeHtml(record.productModel || "-")}</p>
-        <h3>${escapeHtml(record.issueFound || record.rawInput || "No issue summary")}</h3>
+        <h3>${escapeHtml(record.keyPoint || record.issueFound || record.rawInput || "No key point")}</h3>
       </div>
       <div class="beta-card-meta">
         <span>${escapeHtml(record.version || "-")}</span>
