@@ -67,14 +67,14 @@ const HERO_COPY = {
     note: "Private internal tool owned by Julia. Personal workflow only.",
   },
   firmware: {
-    eyebrow: "Julia's Feedback Tracker",
-    title: "Engineering Follow-up Dashboard",
-    note: "Private internal tool owned by Julia. Personal workflow only.",
+    eyebrow: "Firmware Change Log",
+    title: "Release History Dashboard",
+    note: "Track firmware versions, resolved requests, and release-level engineering changes.",
   },
   beta: {
-    eyebrow: "Julia's Feedback Tracker",
-    title: "Engineering Follow-up Dashboard",
-    note: "Private internal tool owned by Julia. Personal workflow only.",
+    eyebrow: "Beta Test Progress",
+    title: "Test Progress Dashboard",
+    note: "Review daily beta findings, user test issues, owners, and follow-up progress.",
   },
 };
 
@@ -135,6 +135,7 @@ const elements = {
   priority: document.querySelector("#priority-filter"),
   dateFrom: document.querySelector("#date-from-filter"),
   dateTo: document.querySelector("#date-to-filter"),
+  filterMore: document.querySelector("#filter-more-toggle"),
   refresh: document.querySelector("#refresh-button"),
   feedbackAdd: document.querySelector("#feedback-add-button"),
   feedbackClose: document.querySelector("#feedback-close-button"),
@@ -2200,6 +2201,12 @@ elements.firmwareList.addEventListener("submit", async (event) => {
   }
 });
 elements.refresh.addEventListener("click", load);
+elements.filterMore?.addEventListener("click", () => {
+  const filterBar = elements.filterMore.closest(".filter-bar");
+  const isExpanded = filterBar?.classList.toggle("is-expanded");
+  elements.filterMore.setAttribute("aria-expanded", String(Boolean(isExpanded)));
+  elements.filterMore.textContent = isExpanded ? "Hide Filters" : "More Filters";
+});
 elements.summary.addEventListener("click", (event) => {
   const button = event.target.closest("[data-summary-filter]");
   if (!button) return;

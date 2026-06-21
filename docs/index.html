@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Engineering Follow-up Dashboard</title>
-    <link rel="stylesheet" href="./styles.css?v=20260621-compact-detail-fix" />
+    <link rel="stylesheet" href="./styles.css?v=20260621-compact-filter-toggle" />
   </head>
   <body>
     <section id="login-screen" class="login-screen">
@@ -54,7 +54,7 @@
             Keyword Search
             <input id="search-filter" placeholder="Search feedback, requests, notes..." />
           </label>
-          <label>
+          <label class="advanced-filter">
             Update Category
             <select id="category-filter">
               <option value="">All Categories</option>
@@ -67,7 +67,7 @@
               <option value="APP">APP</option>
             </select>
           </label>
-          <label>
+          <label class="advanced-filter">
             Priority
             <select id="priority-filter">
               <option value="">All Priorities</option>
@@ -76,7 +76,7 @@
               <option value="P2">P2</option>
             </select>
           </label>
-          <fieldset class="date-range-filter">
+          <fieldset class="date-range-filter advanced-filter">
             <legend>Date Range</legend>
             <label>
               From Date
@@ -87,6 +87,7 @@
               <input id="date-to-filter" type="date" />
             </label>
           </fieldset>
+          <button id="filter-more-toggle" class="filter-more-toggle" type="button" aria-expanded="false">More Filters</button>
           <button id="refresh-button" type="button">Refresh</button>
         </section>
 
@@ -411,6 +412,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260621-compact-detail-fix"></script>
+    <script type="module" src="./app.js?v=20260621-compact-filter-toggle"></script>
   </body>
 </html>
