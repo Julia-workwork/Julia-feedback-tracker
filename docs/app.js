@@ -67,14 +67,14 @@ const HERO_COPY = {
     note: "Private internal tool owned by Julia. Personal workflow only.",
   },
   firmware: {
-    eyebrow: "Firmware Release Tracker",
-    title: "Firmware Change Log",
-    note: "Track firmware versions, release notes, and closed requests.",
+    eyebrow: "Julia's Feedback Tracker",
+    title: "Engineering Follow-up Dashboard",
+    note: "Private internal tool owned by Julia. Personal workflow only.",
   },
   beta: {
-    eyebrow: "Beta Test Progress",
-    title: "Beta Test Control Room",
-    note: "Record test issues, follow-up actions, and validation progress.",
+    eyebrow: "Julia's Feedback Tracker",
+    title: "Engineering Follow-up Dashboard",
+    note: "Private internal tool owned by Julia. Personal workflow only.",
   },
 };
 
@@ -1673,37 +1673,59 @@ function linkedFirmwareTemplate(record) {
   `;
 }
 
+function detailHeaderTagsTemplate(record) {
+  return `
+    <div class="detail-header-tags">
+      ${record.model ? `<span class="detail-tag detail-tag--model">${escapeHtml(record.model)}</span>` : ""}
+      ${categoryPillsTemplate(record)}
+      ${record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : ""}
+    </div>
+  `;
+}
+
+function detailSummaryTemplate(record) {
+  const meta = [record.requestNumber, record.date, record.id].filter(Boolean).join(" · ");
+  return `
+    <section class="detail-summary-card">
+      <div class="card-meta">
+        ${record.status ? `<span class="status-pill">${escapeHtml(STATUS_LABELS[record.status] || record.status)}</span>` : ""}
+        ${record.channel ? `<span class="category-pill category-unknown">${escapeHtml(record.channel)}</span>` : ""}
+      </div>
+      <h2>${escapeHtml(record.keyPoints || "Feedback detail")}</h2>
+      ${meta ? `<p>${escapeHtml(meta)}</p>` : ""}
+    </section>
+  `;
+}
+
 function openDetail(record) {
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
     <div class="detail-panel__header">
-      <div>
-        <div class="card-meta">${categoryPillsTemplate(record)}</div>
-        <h2>${escapeHtml(record.keyPoints || "Feedback detail")}</h2>
-      </div>
+      ${detailHeaderTagsTemplate(record)}
       <div class="detail-actions">
         <button class="copy-detail-summary" type="button">Copy Engineer Summary</button>
         <button type="button" id="close-detail">Close</button>
       </div>
     </div>
+    ${detailSummaryTemplate(record)}
     <dl class="detail-list">
       ${linkedFirmwareTemplate(record)}
+      ${detailRow("Original Feedback", record.upgradeRequirements)}
+      ${detailRow("Chinese", record.chinese)}
+      ${permissionAwareDetailRow("Status", STATUS_LABELS[record.status] || "-", statusSelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Priority", record.priority, prioritySelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("Request number", record.requestNumber, `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
+      ${permissionAwareDetailRow("DONE", record.done, doneSelectTemplate(record), "short")}
+      ${permissionAwareDetailRow("ING", record.ing, `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
+      ${permissionAwareDetailRow("Notes", record.notes, `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
+      ${modificationRowsTemplate(record)}
       ${detailRow("Model", record.model)}
       ${detailRow("User ID", record.id)}
       ${detailRow("Email", record.email)}
       ${detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
-      ${permissionAwareDetailRow("Status", STATUS_LABELS[record.status] || "-", statusSelectTemplate(record), "short")}
-      ${permissionAwareDetailRow("Priority", record.priority, prioritySelectTemplate(record), "short")}
-      ${permissionAwareDetailRow("Request number", record.requestNumber, `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
-      ${permissionAwareDetailRow("ING", record.ing, `<textarea name="ING" rows="3">${escapeHtml(record.ing)}</textarea>`, "wide")}
-      ${permissionAwareDetailRow("DONE", record.done, doneSelectTemplate(record), "short")}
-      ${modificationRowsTemplate(record)}
-      ${detailRow("Upgrade requirements", record.upgradeRequirements)}
-      ${detailRow("Chinese", record.chinese)}
-      ${permissionAwareDetailRow("Notes", record.notes, `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
     </dl>
     ${canEdit() ? `<button class="save-detail-changes" type="button">Save Changes</button>` : ""}
   `;

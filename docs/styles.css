@@ -225,10 +225,14 @@ body.detail-open {
   z-index: 10;
   margin-top: 34px;
   margin-bottom: 22px;
-  border-bottom: 1px solid #d8dee8;
-  background: rgb(247 248 251 / 94%);
-  backdrop-filter: blur(14px);
-  padding: 14px 0 20px;
+  border: 1px solid rgb(255 255 255 / 78%);
+  border-radius: 28px;
+  background: rgb(255 255 255 / 70%);
+  box-shadow:
+    0 24px 70px rgb(21 33 50 / 10%),
+    inset 0 1px 0 rgb(255 255 255 / 95%);
+  backdrop-filter: blur(22px);
+  padding: 16px;
 }
 
 .filter-bar label,
@@ -247,9 +251,9 @@ body.detail-open {
   width: 100%;
   min-width: 0;
   min-height: 46px;
-  border: 1px solid #bfc8d6;
+  border: 1px solid rgb(122 140 166 / 42%);
   border-radius: 999px;
-  background: #ffffff;
+  background: rgb(255 255 255 / 86%);
   color: #11161d;
   font: inherit;
   font-size: 13px;
@@ -270,15 +274,14 @@ body.detail-open {
 .feedback-action-bar {
   display: flex;
   justify-content: flex-end;
-  margin-top: -8px;
+  margin-top: -10px;
   margin-bottom: 22px;
 }
 
 .add-record-button {
   min-height: 46px;
-  border: 2px solid #0874f2;
   border-radius: 999px;
-  border-color: #f2c230;
+  border: 1px solid #f2c230;
   background: #f2c230;
   color: #050505;
   cursor: pointer;
@@ -286,6 +289,9 @@ body.detail-open {
   font-size: 13px;
   font-weight: 900;
   padding: 0 22px;
+  box-shadow:
+    0 14px 30px rgb(242 194 48 / 24%),
+    inset 0 1px 0 rgb(255 255 255 / 34%);
   white-space: nowrap;
 }
 
@@ -328,12 +334,15 @@ body.detail-open {
   overflow: hidden;
   appearance: none;
   text-align: left;
-  min-height: 154px;
-  border: 2px solid var(--summary-accent);
+  min-height: 142px;
+  border: 1px solid color-mix(in srgb, var(--summary-accent) 42%, #d8e0ea);
   border-radius: 26px;
-  background: #ffffff;
-  box-shadow: 0 22px 52px rgb(22 31 45 / 9%);
-  padding: 26px 24px 22px;
+  background: rgb(255 255 255 / 74%);
+  box-shadow:
+    0 22px 58px rgb(22 31 45 / 9%),
+    inset 0 1px 0 rgb(255 255 255 / 95%);
+  backdrop-filter: blur(18px);
+  padding: 24px 24px 20px;
   cursor: pointer;
   transition:
     border-color 180ms ease,
@@ -345,10 +354,10 @@ body.detail-open {
 .summary-strip button::before {
   content: "";
   position: absolute;
-  inset: 27px 24px auto auto;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
+  inset: 0 0 auto;
+  width: auto;
+  height: 2px;
+  border-radius: 26px 26px 0 0;
   background: var(--summary-accent);
 }
 
@@ -699,41 +708,97 @@ body.detail-open {
   top: 0;
   right: 0;
   z-index: 20;
-  width: min(560px, 100vw);
+  width: min(610px, 100vw);
   height: 100vh;
   overflow-y: auto;
   overscroll-behavior: contain;
-  border-left: 1px solid #dce3ec;
-  background: #ffffff;
-  box-shadow: -12px 0 30px rgb(25 36 48 / 18%);
-  padding: 20px;
+  border-left: 1px solid rgb(255 255 255 / 78%);
+  background: rgb(255 255 255 / 78%);
+  box-shadow:
+    -28px 0 90px rgb(20 32 48 / 20%),
+    inset 1px 0 0 rgb(255 255 255 / 86%);
+  backdrop-filter: blur(28px);
+  padding: 22px;
 }
 
 .detail-panel__header {
+  position: sticky;
+  top: -22px;
+  z-index: 2;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 14px;
+  margin: -22px -22px 16px;
+  border-bottom: 1px solid rgb(122 140 166 / 24%);
+  background: rgb(255 255 255 / 72%);
+  backdrop-filter: blur(24px);
+  padding: 17px 22px 14px;
 }
 
-.detail-panel__header h2 {
+.detail-header-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.detail-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid rgb(122 140 166 / 34%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 76%);
+  color: #11161d;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 11px;
+}
+
+.detail-tag--model {
+  border-color: rgb(8 116 242 / 44%);
+  color: #075fc7;
+}
+
+.detail-summary-card {
+  border: 1px solid rgb(122 140 166 / 24%);
+  border-radius: 24px;
+  background: rgb(255 255 255 / 62%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 92%);
+  margin-bottom: 12px;
+  padding: 16px 18px;
+}
+
+.detail-summary-card h2 {
   margin: 10px 0 0;
-  font-size: 20px;
+  color: #11161d;
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 1.08;
+}
+
+.detail-summary-card p {
+  margin: 10px 0 0;
+  color: #687382;
+  font-size: 14px;
+  font-weight: 850;
 }
 
 .detail-editable-row input,
 .detail-editable-row select,
 .detail-editable-row textarea {
   width: 100%;
-  min-height: 38px;
-  border: 1px solid #cad3df;
-  border-radius: 8px;
-  background: #ffffff;
+  min-height: 46px;
+  border: 1px solid rgb(122 140 166 / 34%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 74%);
   color: #11161d;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
-  padding: 8px 11px;
+  padding: 10px 13px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 90%);
 }
 
 .detail-editable-row--short dd {
@@ -762,11 +827,15 @@ body.detail-open {
 }
 
 .detail-editable-row--wide textarea {
-  min-height: 96px;
-  border-color: #e2d8b8;
+  min-height: 78px;
+  border-color: rgb(231 189 61 / 46%);
   border-left: 5px solid #e7bd3d;
-  background: #fffaf0;
-  box-shadow: 0 10px 26px rgb(120 93 24 / 7%);
+  background:
+    linear-gradient(90deg, rgb(231 189 61 / 10%), transparent 38%),
+    rgb(255 252 241 / 82%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 95%),
+    0 10px 26px rgb(120 93 24 / 7%);
   color: #24313d;
   font-weight: 650;
   transition:
@@ -797,11 +866,11 @@ body.detail-open {
 .save-detail-changes {
   width: 100%;
   min-height: 42px;
-  margin-top: 16px;
-  border: 1px solid #0874f2;
+  margin-top: 14px;
+  border: 1px solid #f2c230;
   border-radius: 999px;
-  background: #0874f2;
-  color: #ffffff;
+  background: #f2c230;
+  color: #050505;
   cursor: pointer;
   font: inherit;
   font-size: 13px;
@@ -820,10 +889,10 @@ body.detail-open {
 }
 
 .detail-panel__header button {
-  height: 36px;
-  border: 1px solid #cad3df;
-  border-radius: 6px;
-  background: #ffffff;
+  height: 38px;
+  border: 1px solid rgb(122 140 166 / 38%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 76%);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -881,8 +950,8 @@ body.detail-open {
 }
 
 .detail-list div {
-  border-top: 1px solid #edf1f5;
-  padding: 10px 0;
+  border-top: 1px solid rgb(122 140 166 / 18%);
+  padding: 12px 0;
 }
 
 .view-switch {
