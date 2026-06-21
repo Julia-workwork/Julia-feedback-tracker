@@ -22,6 +22,58 @@ export const STATUS_BY_LABEL = {
   Resolved: "resolved",
 };
 
+export const DASHBOARD_MODULES = ["feedback", "firmware", "beta"];
+
+function normalizeModuleName(value) {
+  const module = clean(value).toLowerCase();
+  return DASHBOARD_MODULES.includes(module) ? module : "";
+}
+
+function normalizeModuleList(values) {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set();
+  const modules = [];
+  values.forEach((value) => {
+    const module = normalizeModuleName(value);
+    if (!module || seen.has(module)) return;
+    seen.add(module);
+    modules.push(module);
+  });
+  return modules;
+}
+
+export function normalizePermissions(auth) {
+  const role = clean(auth?.role || "Viewer");
+  const hasExplicitViews = Array.isArray(auth?.views);
+  const hasExplicitEdits = Array.isArray(auth?.edits);
+  const admin = role === "Admin";
+  const editor = role === "Editor";
+  const edits = admin
+    ? [...DASHBOARD_MODULES]
+    : editor
+      ? hasExplicitEdits
+        ? normalizeModuleList(auth.edits)
+        : [...DASHBOARD_MODULES]
+      : [];
+  const viewSet = new Set(admin || !hasExplicitViews ? DASHBOARD_MODULES : normalizeModuleList(auth.views));
+  edits.forEach((module) => viewSet.add(module));
+
+  return {
+    ...(auth || {}),
+    role,
+    edits,
+    views: DASHBOARD_MODULES.filter((module) => viewSet.has(module)),
+  };
+}
+
+export function canViewModule(auth, module) {
+  return normalizePermissions(auth).views.includes(normalizeModuleName(module));
+}
+
+export function canEditModule(auth, module) {
+  return normalizePermissions(auth).edits.includes(normalizeModuleName(module));
+}
+
 export const BETA_TEST_HEADERS = [
   "Date",
   "Product Model",

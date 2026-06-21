@@ -10,6 +10,9 @@ import {
   filterFirmware,
   inferBetaDraft,
   isFirmwareReleaseLikeFeedbackRow,
+  canEditModule,
+  canViewModule,
+  normalizePermissions,
   normalizeBetaRow,
   normalizeFirmwareRow,
   normalizeRequestNumber,
@@ -23,7 +26,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260621-feedback-folded-fields";
+} from "./lib/domain.mjs?v=20260621-module-permissions";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -59,7 +62,6 @@ const EXPECTED_SHEET_HEADERS = new Set([
   ...BETA_TEST_HEADERS,
 ]);
 const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
-const EDIT_ROLES = new Set(["Admin", "Editor"]);
 const HERO_COPY = {
   feedback: {
     eyebrow: "Julia's Feedback Tracker",
@@ -248,8 +250,12 @@ function setFeedbackInputMessage(text, isError = false) {
   elements.feedbackInputMessage.classList.toggle("is-hidden", !text);
 }
 
-function canEdit() {
-  return EDIT_ROLES.has(state.auth?.role);
+function canView(module) {
+  return canViewModule(state.auth, module);
+}
+
+function canEdit(module = "feedback") {
+  return canEditModule(state.auth, module);
 }
 
 function isAdmin() {
@@ -258,7 +264,7 @@ function isAdmin() {
 
 function updateBetaInputAccess() {
   if (!elements.betaInputPanel || !elements.betaInputForm) return;
-  const allowed = isAdmin();
+  const allowed = canEdit("beta");
   elements.betaInputPanel.hidden = !allowed;
   if (!allowed) {
     elements.betaInputPanel.removeAttribute("open");
@@ -273,7 +279,7 @@ function updateBetaInputAccess() {
 
 function updateFeedbackInputAccess() {
   if (!elements.feedbackAdd || !elements.feedbackInputPanel || !elements.feedbackInputForm) return;
-  const allowed = isAdmin();
+  const allowed = canEdit("feedback");
   elements.feedbackAdd.hidden = !allowed;
   elements.feedbackInputPanel.hidden = !allowed;
   if (!allowed) {
@@ -293,8 +299,8 @@ function setLoginMessage(text, isError = false) {
 }
 
 function saveAuth(auth) {
-  state.auth = auth;
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+  state.auth = normalizePermissions(auth);
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state.auth));
 }
 
 function clearAuth() {
@@ -307,12 +313,28 @@ function showLogin() {
   elements.appShell.classList.add("is-hidden");
 }
 
+function firstAllowedView() {
+  return normalizePermissions(state.auth).views[0] || "feedback";
+}
+
+function updateViewAccess() {
+  elements.viewTabs.forEach((button) => {
+    const view = button.dataset.view;
+    button.hidden = !canView(view);
+  });
+  if (!canView(state.activeView)) {
+    state.activeView = firstAllowedView();
+  }
+}
+
 function showDashboard() {
   elements.loginScreen.classList.add("is-hidden");
   elements.appShell.classList.remove("is-hidden");
   elements.authRole.textContent = `${state.auth?.role || "Viewer"} · ${state.auth?.username || ""}`;
+  updateViewAccess();
   updateFeedbackInputAccess();
   updateBetaInputAccess();
+  setActiveView(state.activeView);
 }
 
 async function credentialHash(username, password) {
@@ -339,6 +361,8 @@ async function login(username, password) {
     token: payload.token,
     username: payload.username,
     role: payload.role,
+    edits: payload.edits,
+    views: payload.views,
     expiresAt: payload.expiresAt,
   };
 }
@@ -354,6 +378,8 @@ async function verifySession(auth) {
     token: auth.token,
     username: payload.username,
     role: payload.role,
+    edits: payload.edits,
+    views: payload.views,
     expiresAt: payload.expiresAt,
   };
 }
@@ -612,14 +638,14 @@ function firmwareCardTemplate(release, index) {
           <div class="closed-requests-header">
             <h3>Closed Requests</h3>
             ${
-              canEdit()
+              canEdit("firmware")
                 ? `<button class="edit-closed-requests" type="button" data-release-index="${index}">Edit</button>`
                 : ""
             }
           </div>
           <div class="closed-request-list">${closedRequests}</div>
           ${
-            canEdit()
+            canEdit("firmware")
               ? `
                 <form class="closed-request-editor is-hidden" data-release-index="${index}">
                   <label>
@@ -710,7 +736,7 @@ function betaSelectTemplate(name, value, options) {
 }
 
 function betaEditableRow(record, header, value, fieldHtml, size = "medium") {
-  return canEdit() ? editableDetailRow(betaDetailLabel(header), fieldHtml, size) : detailRow(betaDetailLabel(header), value);
+  return canEdit("beta") ? editableDetailRow(betaDetailLabel(header), fieldHtml, size) : detailRow(betaDetailLabel(header), value);
 }
 
 function openBetaDetail(record) {
@@ -776,10 +802,10 @@ function openBetaDetail(record) {
       ${betaEditableRow(record, "Notes", record.notes, textareaTemplate("Notes", record.notes, 5), "wide")}
       ${detailRow("Edit Log", record.editLog)}
     </dl>
-    ${canEdit() ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
+    ${canEdit("beta") ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
   `;
   elements.detail.querySelector(".beta-save-follow-up")?.addEventListener("click", async () => {
-    if (!canEdit()) {
+    if (!canEdit("beta")) {
       showToast("You do not have permission to edit.");
       return;
     }
@@ -982,10 +1008,14 @@ function callGoogleAppsScript(params) {
   });
 }
 
-async function verifyEditPermission() {
+async function verifyEditPermission(module = "feedback") {
+  if (!canEdit(module)) {
+    throw new Error("You do not have permission to edit this section.");
+  }
   const payload = await callGoogleAppsScript({
     action: "ping",
     authToken: state.auth?.token || "",
+    module,
   });
   if (!payload?.ok || !payload?.canEdit) {
     throw new Error("You do not have permission to edit.");
@@ -1177,8 +1207,8 @@ function inferFeedbackDraft(input) {
 }
 
 function analyzeFeedbackInput() {
-  if (!isAdmin()) {
-    showToast("Only Admin can analyze feedback input.");
+  if (!canEdit("feedback")) {
+    showToast("You do not have permission to analyze feedback input.");
     return;
   }
   const rawInput = elements.feedbackRawInput.value.trim();
@@ -1213,8 +1243,8 @@ function syncFeedbackRecord(record) {
 }
 
 function clearFeedbackInput() {
-  if (!isAdmin()) {
-    showToast("Only Admin can clear feedback input.");
+  if (!canEdit("feedback")) {
+    showToast("You do not have permission to clear feedback input.");
     return;
   }
   elements.feedbackInputForm.reset();
@@ -1224,8 +1254,8 @@ function clearFeedbackInput() {
 }
 
 function toggleFeedbackInput(open) {
-  if (!isAdmin()) {
-    showToast("Only Admin can add feedback records.");
+  if (!canEdit("feedback")) {
+    showToast("You do not have permission to add feedback records.");
     return;
   }
   elements.feedbackInputPanel.classList.toggle("is-hidden", !open);
@@ -1236,8 +1266,8 @@ function toggleFeedbackInput(open) {
 }
 
 async function saveFeedbackInput() {
-  if (!isAdmin()) {
-    setFeedbackInputMessage("Only Admin can save feedback records.", true);
+  if (!canEdit("feedback")) {
+    setFeedbackInputMessage("You do not have permission to save feedback records.", true);
     return;
   }
   if (!elements.feedbackInputKeyPoints.value.trim() && !elements.feedbackInputUpgrade.value.trim()) {
@@ -1253,7 +1283,7 @@ async function saveFeedbackInput() {
   elements.feedbackSave.textContent = "Saving...";
   setFeedbackInputMessage("Saving feedback record...");
   try {
-    await verifyEditPermission();
+    await verifyEditPermission("feedback");
     const result = await syncFeedbackRecord(record);
     const normalized = normalizeRow({
       ...record,
@@ -1324,8 +1354,8 @@ function syncBetaRecordChanges(record, changes) {
 }
 
 function analyzeBetaInput() {
-  if (!isAdmin()) {
-    showToast("Only Admin can analyze beta input.");
+  if (!canEdit("beta")) {
+    showToast("You do not have permission to analyze beta input.");
     return;
   }
   const rawInput = elements.betaRawInput.value.trim();
@@ -1350,8 +1380,8 @@ function analyzeBetaInput() {
 }
 
 function clearBetaInput() {
-  if (!isAdmin()) {
-    showToast("Only Admin can clear beta input.");
+  if (!canEdit("beta")) {
+    showToast("You do not have permission to clear beta input.");
     return;
   }
   elements.betaInputForm.reset();
@@ -1363,8 +1393,8 @@ function clearBetaInput() {
 }
 
 async function saveBetaInput() {
-  if (!isAdmin()) {
-    setBetaInputMessage("Only Admin can save beta test records.", true);
+  if (!canEdit("beta")) {
+    setBetaInputMessage("You do not have permission to save beta test records.", true);
     return;
   }
   if (!elements.betaRawInput.value.trim()) {
@@ -1379,7 +1409,7 @@ async function saveBetaInput() {
   elements.betaSave.textContent = "Saving...";
   setBetaInputMessage("Saving beta test record...");
   try {
-    await verifyEditPermission();
+    await verifyEditPermission("beta");
     const result = await syncBetaTestRecord(record);
     state.betaRecords.unshift(normalizeBetaRow({ ...record, __rowNumber: result.row || "" }));
     renderBetaFilterOptions();
@@ -1450,7 +1480,7 @@ function editableDetailRow(label, fieldHtml, size = "medium") {
 }
 
 function permissionAwareDetailRow(label, value, fieldHtml, size = "medium") {
-  return canEdit() ? editableDetailRow(label, fieldHtml, size) : detailRow(label, value);
+  return canEdit("feedback") ? editableDetailRow(label, fieldHtml, size) : detailRow(label, value);
 }
 
 function statusSelectTemplate(record) {
@@ -1728,14 +1758,14 @@ function openDetail(record) {
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
     </dl>
-    ${canEdit() ? `<button class="save-detail-changes" type="button">Save Changes</button>` : ""}
+    ${canEdit("feedback") ? `<button class="save-detail-changes" type="button">Save Changes</button>` : ""}
   `;
   document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
     await copyEngineerSummary(record);
     showToast("Engineer summary copied");
   });
   document.querySelector(".save-detail-changes")?.addEventListener("click", async () => {
-    if (!canEdit()) {
+    if (!canEdit("feedback")) {
       showToast("You do not have permission to edit.");
       return;
     }
@@ -1748,7 +1778,7 @@ function openDetail(record) {
     if (!confirmed) return;
     setDetailSaving(true);
     try {
-      await verifyEditPermission();
+      await verifyEditPermission("feedback");
       await saveRecordChanges(record, changes);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Update failed");
@@ -1953,9 +1983,9 @@ async function loadBetaRecords() {
 }
 
 async function load() {
-  setMessage("Loading feedback data...");
-  setFirmwareMessage("Loading firmware data...");
-  setBetaMessage("Loading beta test data...");
+  setMessage(canView("feedback") ? "Loading feedback data..." : "");
+  setFirmwareMessage(canView("firmware") ? "Loading firmware data..." : "");
+  setBetaMessage(canView("beta") ? "Loading beta test data..." : "");
   renderSummary([]);
   renderFirmwareSummary([]);
   renderBetaSummary([]);
@@ -1964,9 +1994,9 @@ async function load() {
   elements.betaList.innerHTML = "";
   try {
     const [feedbackRows, firmwareResult, betaResult] = await Promise.allSettled([
-      loadSheetRows({ gid: FEEDBACK_SHEET_GID }),
-      loadFirmwareRecords(),
-      loadBetaRecords(),
+      canView("feedback") ? loadSheetRows({ gid: FEEDBACK_SHEET_GID }) : Promise.resolve([]),
+      canView("firmware") ? loadFirmwareRecords() : Promise.resolve([]),
+      canView("beta") ? loadBetaRecords() : Promise.resolve([]),
     ]);
 
     if (feedbackRows.status !== "fulfilled") {
@@ -2013,6 +2043,9 @@ async function load() {
 }
 
 function setActiveView(view) {
+  if (!canView(view)) {
+    view = firstAllowedView();
+  }
   state.activeView = view;
   const hero = HERO_COPY[view] || HERO_COPY.feedback;
   if (elements.heroEyebrow) elements.heroEyebrow.textContent = hero.eyebrow;
@@ -2029,7 +2062,10 @@ function setActiveView(view) {
 }
 
 elements.viewTabs.forEach((button) => {
-  button.addEventListener("click", () => setActiveView(button.dataset.view));
+  button.addEventListener("click", () => {
+    if (!canView(button.dataset.view)) return;
+    setActiveView(button.dataset.view);
+  });
 });
 elements.model.addEventListener("change", () => {
   state.filters.model = elements.model.value;
@@ -2171,7 +2207,7 @@ elements.firmwareList.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (!canEdit()) {
+  if (!canEdit("firmware")) {
     showToast("You do not have permission to edit.");
     return;
   }
@@ -2185,7 +2221,7 @@ elements.firmwareList.addEventListener("submit", async (event) => {
   }
 
   try {
-    await verifyEditPermission();
+    await verifyEditPermission("firmware");
     await syncFirmwareClosedRequests(release, nextValue);
     release.closedRequestsRaw = nextValue;
     release.closedRequests = parseClosedRequests(nextValue);
