@@ -203,6 +203,7 @@ body.detail-open {
 }
 
 .filter-bar,
+.module-filter-toggle,
 .feedback-action-bar,
 .summary-strip,
 .status-board,
@@ -273,6 +274,66 @@ body.detail-open {
 
 .filter-more-toggle {
   display: none;
+}
+
+.module-filter-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 34px;
+  margin-bottom: 14px;
+  border: 1px solid rgb(255 255 255 / 78%);
+  border-radius: 28px;
+  background: rgb(255 255 255 / 74%);
+  box-shadow:
+    0 18px 48px rgb(21 33 50 / 9%),
+    inset 0 1px 0 rgb(255 255 255 / 95%);
+  backdrop-filter: blur(22px);
+  padding: 14px 16px 14px 20px;
+}
+
+.module-filter-toggle p {
+  margin: 0 0 4px;
+  color: #11161d;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.module-filter-toggle span {
+  display: block;
+  max-width: 980px;
+  overflow: hidden;
+  color: #596475;
+  font-size: 13px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-filter-toggle button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  border: 1px solid #050505;
+  border-radius: 999px;
+  background: #050505;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 0 20px;
+}
+
+.firmware-filter-bar.is-collapsed,
+.beta-filter-bar.is-collapsed {
+  display: none;
+}
+
+.module-filter-toggle + .filter-bar {
+  margin-top: 0;
 }
 
 .feedback-action-bar {
@@ -1909,6 +1970,7 @@ body.detail-open {
   }
 
   .filter-bar,
+  .module-filter-toggle,
   .summary-strip,
     .status-board,
     .firmware-summary,
@@ -1918,6 +1980,15 @@ body.detail-open {
     .state-message,
     .app-footer {
     width: min(100% - 28px, 1740px);
+  }
+
+  .module-filter-toggle {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .module-filter-toggle span {
+    max-width: 100%;
   }
 
   .filter-bar,

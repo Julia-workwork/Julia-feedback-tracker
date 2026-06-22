@@ -62,6 +62,12 @@ const EXPECTED_SHEET_HEADERS = new Set([
   ...BETA_TEST_HEADERS,
 ]);
 const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
+const BETA_TEST_TYPE_OPTIONS = ["Firmware", "APP", "CPS", "Hardware", "Accessory"];
+const BETA_TESTER_TYPE_OPTIONS = ["Internal Test", "User Beta Test", "Engineer Test", "KOC Test"];
+const BETA_ISSUE_SOURCE_OPTIONS = ["User Report", "Internal Found", "Regression", "Known Issue"];
+const BETA_STATUS_OPTIONS = ["Open", "Need Review", "Reproducing", "In Progress", "Resolved", "Closed"];
+const BETA_SEVERITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
+const BETA_PRIORITY_OPTIONS = ["P0", "P1", "P2"];
 const HERO_COPY = {
   feedback: {
     eyebrow: "Julia's Feedback Tracker",
@@ -172,6 +178,9 @@ const elements = {
   firmwareDateFrom: document.querySelector("#firmware-date-from-filter"),
   firmwareDateTo: document.querySelector("#firmware-date-to-filter"),
   firmwareRefresh: document.querySelector("#firmware-refresh-button"),
+  firmwareFilterBar: document.querySelector("#firmware-filter-bar"),
+  firmwareFilterToggle: document.querySelector("#firmware-filter-toggle"),
+  firmwareFilterSummary: document.querySelector("#firmware-filter-summary"),
   firmwareSummary: document.querySelector("#firmware-summary"),
   firmwareMessage: document.querySelector("#firmware-message"),
   firmwareList: document.querySelector("#firmware-list"),
@@ -204,6 +213,9 @@ const elements = {
   betaDateFrom: document.querySelector("#beta-date-from-filter"),
   betaDateTo: document.querySelector("#beta-date-to-filter"),
   betaRefresh: document.querySelector("#beta-refresh-button"),
+  betaFilterBar: document.querySelector("#beta-filter-bar"),
+  betaFilterToggle: document.querySelector("#beta-filter-toggle"),
+  betaFilterSummary: document.querySelector("#beta-filter-summary"),
   betaSummary: document.querySelector("#beta-summary"),
   betaMessage: document.querySelector("#beta-message"),
   betaList: document.querySelector("#beta-list"),
@@ -426,14 +438,17 @@ function renderFirmwareFilterOptions() {
   elements.firmwareVersion.value = versions.includes(currentVersion) ? currentVersion : "all";
   state.firmwareFilters.model = elements.firmwareModel.value;
   state.firmwareFilters.version = elements.firmwareVersion.value;
+  updateFirmwareFilterSummary();
 }
 
 function renderBetaFilterOptions() {
   const currentModel = elements.betaModel.value;
   const currentVersion = elements.betaVersion.value;
+  const currentTesterType = elements.betaTesterType.value;
   const models = uniqueBetaModels(state.betaRecords);
   const selectedModel = models.includes(currentModel) ? currentModel : "all";
   const versions = uniqueBetaVersions(state.betaRecords, selectedModel);
+  const testerTypes = selectOptionsFromRecords(state.betaRecords, "testerType", BETA_TESTER_TYPE_OPTIONS);
 
   elements.betaModel.innerHTML = `<option value="all">All Models</option>${models
     .map((model) => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`)
@@ -441,11 +456,86 @@ function renderBetaFilterOptions() {
   elements.betaVersion.innerHTML = `<option value="all">All Versions</option>${versions
     .map((version) => `<option value="${escapeHtml(version)}">${escapeHtml(version)}</option>`)
     .join("")}`;
+  renderSelectOptions(elements.betaTesterType, testerTypes, currentTesterType, "All Tester Types");
 
   elements.betaModel.value = selectedModel;
   elements.betaVersion.value = versions.includes(currentVersion) ? currentVersion : "all";
   state.betaFilters.model = elements.betaModel.value;
   state.betaFilters.version = elements.betaVersion.value;
+  state.betaFilters.testerType = elements.betaTesterType.value;
+  renderBetaInputOptions();
+  updateBetaFilterSummary();
+}
+
+function selectOptionsFromRecords(records, field, defaults = []) {
+  const values = new Set(defaults.filter(Boolean));
+  records.forEach((record) => {
+    const value = String(record[field] || "").trim();
+    if (value) values.add(value);
+  });
+  return [...values].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+function renderSelectOptions(select, options, currentValue, placeholder = "-") {
+  const allOptions = [...new Set([currentValue, ...options].filter(Boolean))];
+  select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>${allOptions
+    .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
+    .join("")}`;
+  select.value = allOptions.includes(currentValue) ? currentValue : "";
+}
+
+function renderBetaInputOptions() {
+  renderSelectOptions(
+    elements.betaInputTestType,
+    selectOptionsFromRecords(state.betaRecords, "testType", BETA_TEST_TYPE_OPTIONS),
+    elements.betaInputTestType.value,
+  );
+  renderSelectOptions(
+    elements.betaInputTesterType,
+    selectOptionsFromRecords(state.betaRecords, "testerType", BETA_TESTER_TYPE_OPTIONS),
+    elements.betaInputTesterType.value,
+  );
+}
+
+function toggleModuleFilters(module, shouldExpand) {
+  const bar = module === "firmware" ? elements.firmwareFilterBar : elements.betaFilterBar;
+  const button = module === "firmware" ? elements.firmwareFilterToggle : elements.betaFilterToggle;
+  if (!bar || !button) return;
+  bar.classList.toggle("is-collapsed", !shouldExpand);
+  button.setAttribute("aria-expanded", String(shouldExpand));
+  button.textContent = shouldExpand ? "Hide filters" : "Show filters";
+}
+
+function dateRangeSummary(from, to) {
+  if (from && to) return `${from} to ${to}`;
+  if (from) return `From ${from}`;
+  if (to) return `To ${to}`;
+  return "No date range";
+}
+
+function updateFirmwareFilterSummary() {
+  if (!elements.firmwareFilterSummary) return;
+  const parts = [
+    state.firmwareFilters.model === "all" ? "All Models" : state.firmwareFilters.model,
+    state.firmwareFilters.version === "all" ? "All Versions" : state.firmwareFilters.version,
+    state.firmwareFilters.search ? `Search: ${state.firmwareFilters.search}` : "",
+    dateRangeSummary(state.firmwareFilters.dateFrom, state.firmwareFilters.dateTo),
+  ].filter(Boolean);
+  elements.firmwareFilterSummary.textContent = parts.join(" · ");
+}
+
+function updateBetaFilterSummary() {
+  if (!elements.betaFilterSummary) return;
+  const parts = [
+    state.betaFilters.model === "all" ? "All Models" : state.betaFilters.model,
+    state.betaFilters.version === "all" ? "All Versions" : state.betaFilters.version,
+    state.betaFilters.testerType || "All Tester Types",
+    state.betaFilters.status || "All Statuses",
+    state.betaFilters.priority || "All Priorities",
+    state.betaFilters.search ? `Search: ${state.betaFilters.search}` : "",
+    dateRangeSummary(state.betaFilters.dateFrom, state.betaFilters.dateTo),
+  ].filter(Boolean);
+  elements.betaFilterSummary.textContent = parts.join(" · ");
 }
 
 function renderSummary(records) {
@@ -726,9 +816,11 @@ function textareaTemplate(name, value, rows = 4) {
 }
 
 function betaSelectTemplate(name, value, options) {
+  const allOptions = [...new Set([value, ...options].filter(Boolean))];
   return `
     <select name="${escapeHtml(name)}">
-      ${options
+      <option value="">-</option>
+      ${allOptions
         .map((option) => `<option value="${escapeHtml(option)}"${option === value ? " selected" : ""}>${escapeHtml(option || "-")}</option>`)
         .join("")}
     </select>
@@ -766,30 +858,30 @@ function openBetaDetail(record) {
         record,
         "Test Type",
         record.testType,
-        betaSelectTemplate("Test Type", record.testType, ["", "Firmware Beta", "APP Beta", "CPS Beta", "Hardware Test", "Regression Test"]),
+        betaSelectTemplate("Test Type", record.testType, selectOptionsFromRecords(state.betaRecords, "testType", BETA_TEST_TYPE_OPTIONS)),
       )}
       ${betaEditableRow(
         record,
         "Tester Type",
         record.testerType,
-        betaSelectTemplate("Tester Type", record.testerType, ["", "Internal Test", "User Beta Test", "Engineer Test", "KOC Test"]),
+        betaSelectTemplate("Tester Type", record.testerType, selectOptionsFromRecords(state.betaRecords, "testerType", BETA_TESTER_TYPE_OPTIONS)),
       )}
       ${detailRow("Tester / Owner", record.testerOwner)}
       ${betaEditableRow(
         record,
         "Issue Source",
         record.issueSource,
-        betaSelectTemplate("Issue Source", record.issueSource, ["", "Internal Test", "User Beta Test", "Engineer Test", "KOC Test", "User Feedback", "Internal QA"]),
+        betaSelectTemplate("Issue Source", record.issueSource, selectOptionsFromRecords(state.betaRecords, "issueSource", BETA_ISSUE_SOURCE_OPTIONS)),
       )}
       ${betaEditableRow(record, "Issue Found", record.issueFound, textareaTemplate("Issue Found", record.issueFound, 4), "wide")}
       ${betaEditableRow(record, "Key Point", record.keyPoint, textareaTemplate("Key Point", record.keyPoint, 3), "wide")}
-      ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, ["", "Critical", "High", "Medium", "Low"]), "short")}
-      ${betaEditableRow(record, "Priority", record.priority, betaSelectTemplate("Priority", record.priority, ["", "P0", "P1", "P2"]), "short")}
+      ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, BETA_SEVERITY_OPTIONS), "short")}
+      ${betaEditableRow(record, "Priority", record.priority, betaSelectTemplate("Priority", record.priority, BETA_PRIORITY_OPTIONS), "short")}
       ${betaEditableRow(
         record,
         "Status",
         record.status,
-        betaSelectTemplate("Status", record.status, ["", "Open", "Need Review", "Reproducing", "In Progress", "Resolved", "Closed"]),
+        betaSelectTemplate("Status", record.status, BETA_STATUS_OPTIONS),
         "short",
       )}
       ${betaEditableRow(record, "Assigned To", record.assignedTo, inputTemplate("Assigned To", record.assignedTo))}
@@ -1312,7 +1404,7 @@ function betaPayloadFromInput() {
     "Test Item": elements.betaInputTestItem.value.trim(),
     "Tester Type": elements.betaInputTesterType.value.trim(),
     "Tester / Owner": elements.betaInputTesterOwner.value.trim(),
-    "Issue Source": elements.betaInputTesterType.value.trim(),
+    "Issue Source": "User Report",
     "Issue Found": elements.betaInputIssueFound.value.trim(),
     "Key Point": elements.betaInputKeyPoint.value.trim(),
     Severity: elements.betaInputSeverity.value.trim(),
@@ -2098,21 +2190,28 @@ elements.firmwareModel.addEventListener("change", () => {
 });
 elements.firmwareVersion.addEventListener("change", () => {
   state.firmwareFilters.version = elements.firmwareVersion.value;
+  updateFirmwareFilterSummary();
   renderFirmware();
 });
 elements.firmwareSearch.addEventListener("input", () => {
   state.firmwareFilters.search = elements.firmwareSearch.value;
+  updateFirmwareFilterSummary();
   renderFirmware();
 });
 elements.firmwareDateFrom.addEventListener("change", () => {
   state.firmwareFilters.dateFrom = elements.firmwareDateFrom.value;
+  updateFirmwareFilterSummary();
   renderFirmware();
 });
 elements.firmwareDateTo.addEventListener("change", () => {
   state.firmwareFilters.dateTo = elements.firmwareDateTo.value;
+  updateFirmwareFilterSummary();
   renderFirmware();
 });
 elements.firmwareRefresh.addEventListener("click", load);
+elements.firmwareFilterToggle.addEventListener("click", () => {
+  toggleModuleFilters("firmware", elements.firmwareFilterBar.classList.contains("is-collapsed"));
+});
 elements.feedbackAdd.addEventListener("click", () => {
   const isClosed = elements.feedbackInputPanel.classList.contains("is-hidden");
   toggleFeedbackInput(isClosed);
@@ -2131,33 +2230,43 @@ elements.betaModel.addEventListener("change", () => {
 });
 elements.betaVersion.addEventListener("change", () => {
   state.betaFilters.version = elements.betaVersion.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaTesterType.addEventListener("change", () => {
   state.betaFilters.testerType = elements.betaTesterType.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaStatus.addEventListener("change", () => {
   state.betaFilters.status = elements.betaStatus.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaPriority.addEventListener("change", () => {
   state.betaFilters.priority = elements.betaPriority.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaSearch.addEventListener("input", () => {
   state.betaFilters.search = elements.betaSearch.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaDateFrom.addEventListener("change", () => {
   state.betaFilters.dateFrom = elements.betaDateFrom.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaDateTo.addEventListener("change", () => {
   state.betaFilters.dateTo = elements.betaDateTo.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaRefresh.addEventListener("click", load);
+elements.betaFilterToggle.addEventListener("click", () => {
+  toggleModuleFilters("beta", elements.betaFilterBar.classList.contains("is-collapsed"));
+});
 elements.betaAnalyze.addEventListener("click", analyzeBetaInput);
 elements.betaClear.addEventListener("click", clearBetaInput);
 elements.betaInputForm.addEventListener("submit", async (event) => {

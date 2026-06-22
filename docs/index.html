@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Engineering Follow-up Dashboard</title>
-    <link rel="stylesheet" href="./styles.css?v=20260621-beta-keypoint-detail-scroll" />
+    <link rel="stylesheet" href="./styles.css?v=20260622-collapsible-module-filters" />
   </head>
   <body>
     <section id="login-screen" class="login-screen">
@@ -196,7 +196,14 @@
       </section>
 
       <section id="firmware-view" class="dashboard-view is-hidden" data-view-panel="firmware">
-        <section class="filter-bar firmware-filter-bar" aria-label="Firmware filters">
+        <section class="module-filter-toggle" aria-label="Firmware filter controls">
+          <div>
+            <p>Firmware Filters</p>
+            <span id="firmware-filter-summary">All Models · All Versions · No date range</span>
+          </div>
+          <button id="firmware-filter-toggle" type="button" aria-expanded="false" aria-controls="firmware-filter-bar">Show filters</button>
+        </section>
+        <section id="firmware-filter-bar" class="filter-bar firmware-filter-bar is-collapsed" aria-label="Firmware filters">
           <label>
             Product Model
             <select id="firmware-model-filter">
@@ -267,11 +274,11 @@
                 Test Type
                 <select id="beta-input-test-type">
                   <option value="">-</option>
-                  <option>Firmware Beta</option>
-                  <option>APP Beta</option>
-                  <option>CPS Beta</option>
-                  <option>Hardware Test</option>
-                  <option>Regression Test</option>
+                  <option>Firmware</option>
+                  <option>APP</option>
+                  <option>CPS</option>
+                  <option>Hardware</option>
+                  <option>Accessory</option>
                 </select>
               </label>
               <label>
@@ -341,7 +348,14 @@
           </form>
         </details>
 
-        <section class="filter-bar beta-filter-bar" aria-label="Beta test filters">
+        <section class="module-filter-toggle" aria-label="Beta test filter controls">
+          <div>
+            <p>Beta Filters</p>
+            <span id="beta-filter-summary">All Models · All Versions · All Statuses</span>
+          </div>
+          <button id="beta-filter-toggle" type="button" aria-expanded="false" aria-controls="beta-filter-bar">Show filters</button>
+        </section>
+        <section id="beta-filter-bar" class="filter-bar beta-filter-bar is-collapsed" aria-label="Beta test filters">
           <label>
             Product Model
             <select id="beta-model-filter">
@@ -412,6 +426,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260621-login-load-fix"></script>
+    <script type="module" src="./app.js?v=20260622-collapsible-module-filters"></script>
   </body>
 </html>
