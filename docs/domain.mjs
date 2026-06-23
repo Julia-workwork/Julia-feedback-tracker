@@ -694,6 +694,12 @@ function parseInputLead(input) {
 function inferKeyPoint(issueFound) {
   const text = clean(issueFound);
   if (!text) return "";
+  if (/(frequent contacts|quick pre-?written messages|pre-?configured|broadcast|point to point|point-to-point)/i.test(text)) {
+    return "Frequent contacts and quick pre-written messages need recall, broadcast, and preconfigured recipient selection support.";
+  }
+  if (/(selected band|programmed aprs frequency|aprs frequency|ota patch|bt ver|bluetooth version)/i.test(text)) {
+    return "APRS/GNSS behavior needs validation against selected band, configured frequency, firmware, and Bluetooth versions.";
+  }
   if (/lost.*usps|usps.*lost|package.*lost|lost.*package/i.test(text)) {
     return "Package appears lost in USPS system and may arrive very late.";
   }
@@ -706,7 +712,13 @@ function inferKeyPoint(issueFound) {
   if (/(aprs|gnss|packet|位置|定位)/i.test(text)) {
     return "APRS/GNSS behavior needs validation against expected firmware settings.";
   }
-  return text.split(/\n+/).map((line) => clean(line)).find(Boolean) || "";
+  const reportedProblem = text.match(
+    /(?:cannot|can't|no way|no option|does not|doesn't|not working|fails?|unable|missing|wrong|error|无法|不能|没有|错误|异常)[^.!?。；;\n]{0,140}/i,
+  );
+  if (reportedProblem) {
+    return `Reported issue: ${clean(reportedProblem[0])}.`;
+  }
+  return "Beta test issue requires engineering review; confirm expected behavior, affected version, and reproduction steps.";
 }
 
 export function inferBetaDraft(input) {

@@ -843,7 +843,7 @@ function openBetaDetail(record) {
           ${record.status ? `<span class="status-pill">${escapeHtml(record.status)}</span>` : ""}
         </div>
         <p class="beta-detail-heading">${escapeHtml(betaDetailHeading(record) || "Beta test detail")}</p>
-        <h2>${escapeHtml(record.issueFound || "Beta test detail")}</h2>
+        <h2>${escapeHtml(record.keyPoint || record.issueFound || "Beta test detail")}</h2>
       </div>
       <div class="detail-actions">
         <button type="button" id="close-detail">Close</button>
