@@ -988,7 +988,8 @@ body.detail-open {
   padding: 0 12px;
 }
 
-.detail-panel__header .copy-detail-summary {
+.detail-panel__header .copy-detail-summary,
+.detail-panel__header .copy-beta-detail {
   border-color: #050505;
   background: #050505;
   color: #ffffff;
@@ -1754,7 +1755,7 @@ body.detail-open {
 
 .beta-card {
   display: grid;
-  grid-template-columns: minmax(260px, 1.4fr) minmax(220px, 0.9fr) minmax(220px, 0.8fr) minmax(280px, 1fr);
+  grid-template-columns: minmax(112px, 0.42fr) minmax(280px, 1.35fr) minmax(220px, 0.9fr) minmax(220px, 0.8fr) minmax(280px, 1fr);
   gap: 16px;
   align-items: center;
   border: 1px solid #d7dee8;
@@ -1789,6 +1790,20 @@ body.detail-open {
   color: #11161d;
   font-size: 1rem;
   line-height: 1.25;
+}
+
+.beta-card-date {
+  border-right: 1px solid #e6ebf2;
+  padding-right: 12px;
+}
+
+.beta-card-date strong {
+  display: block;
+  margin-top: 5px;
+  color: #11161d;
+  font-size: 0.92rem;
+  font-weight: 950;
+  line-height: 1.1;
 }
 
 .beta-card-meta,
@@ -1941,6 +1956,12 @@ body.detail-open {
   .beta-card {
     grid-template-columns: 1fr;
     grid-column: auto;
+  }
+
+  .beta-card-date {
+    border-right: 0;
+    border-bottom: 1px solid #e6ebf2;
+    padding: 0 0 10px;
   }
 
   .beta-draft-grid label:first-child,

@@ -782,6 +782,18 @@ function betaSeverityClass(severity) {
   return "severity-unknown";
 }
 
+function dateSortValue(value) {
+  const text = cleanText(value);
+  if (!text) return 0;
+  const parsed = Date.parse(text);
+  if (!Number.isNaN(parsed)) return parsed;
+  const slashDate = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    return new Date(Number(slashDate[3]), Number(slashDate[1]) - 1, Number(slashDate[2])).getTime();
+  }
+  return 0;
+}
+
 function betaRecordTemplate(record, index) {
   const chips = [
     record.severity ? `<span class="severity-pill ${betaSeverityClass(record.severity)}">${escapeHtml(record.severity)}</span>` : "",
@@ -792,7 +804,11 @@ function betaRecordTemplate(record, index) {
     .join("");
   return `
     <article class="beta-card" data-beta-index="${index}" role="button" tabindex="0">
-      <div>
+      <div class="beta-card-date">
+        <p>Date</p>
+        <strong>${escapeHtml(record.date || "-")}</strong>
+      </div>
+      <div class="beta-card-main">
         <p>${escapeHtml(record.productModel || "-")}</p>
         <h3>${escapeHtml(record.keyPoint || record.issueFound || record.rawInput || "No key point")}</h3>
       </div>
@@ -831,6 +847,50 @@ function betaEditableRow(record, header, value, fieldHtml, size = "medium") {
   return canEdit("beta") ? editableDetailRow(betaDetailLabel(header), fieldHtml, size) : detailRow(betaDetailLabel(header), value);
 }
 
+function betaFullDetail(record) {
+  return [
+    `Date: ${record.date || "-"}`,
+    `Product Model: ${record.productModel || "-"}`,
+    `Version: ${record.version || "-"}`,
+    `Test Item: ${record.testItem || "-"}`,
+    `Test Type: ${record.testType || "-"}`,
+    `Tester Type: ${record.testerType || "-"}`,
+    `Tester / Owner: ${record.testerOwner || "-"}`,
+    `Issue Source: ${record.issueSource || "-"}`,
+    `Key Point: ${record.keyPoint || "-"}`,
+    `Issue Found: ${record.issueFound || "-"}`,
+    `Severity: ${record.severity || "-"}`,
+    `Priority: ${record.priority || "-"}`,
+    `Status: ${record.status || "-"}`,
+    `Assigned To: ${record.assignedTo || "-"}`,
+    `Engineering Response: ${record.engineeringResponse || "-"}`,
+    `Next Action: ${record.nextAction || "-"}`,
+    `Target Date: ${record.targetDate || "-"}`,
+    `Resolved Date: ${record.resolvedDate || "-"}`,
+    `Related Request Number: ${record.relatedRequestNumber || "-"}`,
+    `Related Firmware Version: ${record.relatedFirmwareVersion || "-"}`,
+    `Process Follow-up: ${record.notes || "-"}`,
+    `Edit Log: ${record.editLog || "-"}`,
+  ].join("\n");
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
+
 function openBetaDetail(record) {
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
@@ -846,6 +906,7 @@ function openBetaDetail(record) {
         <h2>${escapeHtml(record.keyPoint || record.issueFound || "Beta test detail")}</h2>
       </div>
       <div class="detail-actions">
+        <button class="copy-beta-detail" type="button">Copy Full Info</button>
         <button type="button" id="close-detail">Close</button>
       </div>
     </div>
@@ -896,6 +957,10 @@ function openBetaDetail(record) {
     </dl>
     ${canEdit("beta") ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
   `;
+  elements.detail.querySelector(".copy-beta-detail")?.addEventListener("click", async () => {
+    await copyText(betaFullDetail(record));
+    showToast("Beta detail copied");
+  });
   elements.detail.querySelector(".beta-save-follow-up")?.addEventListener("click", async () => {
     if (!canEdit("beta")) {
       showToast("You do not have permission to edit.");
@@ -927,7 +992,7 @@ function openBetaDetail(record) {
 
 function renderBeta() {
   const visible = filterBetaTests(state.betaRecords, state.betaFilters).sort((a, b) =>
-    String(b.date).localeCompare(String(a.date)),
+    dateSortValue(b.date) - dateSortValue(a.date) || String(b.date).localeCompare(String(a.date)),
   );
   renderBetaSummary(visible);
   if (!state.betaRecords.length && !elements.betaMessage.textContent) {
