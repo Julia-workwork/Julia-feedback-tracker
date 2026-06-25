@@ -808,16 +808,19 @@ function betaRecordTemplate(record, index) {
       <div class="beta-card-date">
         <p>Date</p>
         <strong>${escapeHtml(record.date || "-")}</strong>
+        <p>Model</p>
+        <strong>${escapeHtml(record.productModel || "-")}</strong>
+        <p>Tester / Owner</p>
+        <strong>${escapeHtml(record.testerOwner || "-")}</strong>
       </div>
       <div class="beta-card-main">
-        <p>${escapeHtml(record.productModel || "-")}</p>
+        <p>${escapeHtml(record.testItem || "-")}</p>
         <h3>${escapeHtml(record.keyPoint || "No key point")}</h3>
       </div>
       <div class="beta-card-meta">
         <span>${escapeHtml(record.version || "-")}</span>
         <span>${escapeHtml(record.testItem || "-")}</span>
         <span>${escapeHtml(record.testType || "-")}</span>
-        <span>${escapeHtml(record.testerOwner || "-")}</span>
       </div>
       <div class="beta-card-chips">${chips}</div>
       <p class="beta-next-action">${escapeHtml(record.nextAction || record.notes || "-")}</p>
