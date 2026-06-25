@@ -744,7 +744,7 @@ export function inferBetaDraft(input) {
 
   return {
     issueFound,
-    keyPoint: inferKeyPoint(issueFound),
+    keyPoint: "",
     date: parsedInput.date,
     testerOwner: parsedInput.testerOwner,
     severity,

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Engineering Follow-up Dashboard</title>
-    <link rel="stylesheet" href="./styles.css?v=20260622-collapsible-module-filters" />
+    <link rel="stylesheet" href="./styles.css?v=20260625-beta-input-scroll" />
   </head>
   <body>
     <section id="login-screen" class="login-screen">
@@ -338,6 +338,10 @@
                 Next Action
                 <textarea id="beta-input-next-action" rows="2"></textarea>
               </label>
+              <label>
+                Process Follow-up
+                <textarea id="beta-input-notes" rows="2" placeholder="Follow-up notes, validation progress, reminders..."></textarea>
+              </label>
             </div>
             <div class="quick-input-actions">
               <button id="beta-analyze-button" type="button">Analyze</button>
@@ -426,6 +430,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260622-collapsible-module-filters"></script>
+    <script type="module" src="./app.js?v=20260625-beta-input-scroll"></script>
   </body>
 </html>

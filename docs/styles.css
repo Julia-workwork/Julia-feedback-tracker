@@ -19,10 +19,6 @@ body {
   background: #f7f8fb;
 }
 
-body.detail-open {
-  overflow: hidden;
-}
-
 .is-hidden {
   display: none !important;
 }

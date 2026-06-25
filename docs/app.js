@@ -26,7 +26,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260621-login-load-fix";
+} from "./lib/domain.mjs?v=20260625-beta-keypoint-manual";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -200,6 +200,7 @@ const elements = {
   betaInputPriority: document.querySelector("#beta-input-priority"),
   betaInputStatus: document.querySelector("#beta-input-status"),
   betaInputNextAction: document.querySelector("#beta-input-next-action"),
+  betaInputNotes: document.querySelector("#beta-input-notes"),
   betaAnalyze: document.querySelector("#beta-analyze-button"),
   betaSave: document.querySelector("#beta-save-button"),
   betaClear: document.querySelector("#beta-clear-button"),
@@ -810,12 +811,13 @@ function betaRecordTemplate(record, index) {
       </div>
       <div class="beta-card-main">
         <p>${escapeHtml(record.productModel || "-")}</p>
-        <h3>${escapeHtml(record.keyPoint || record.issueFound || record.rawInput || "No key point")}</h3>
+        <h3>${escapeHtml(record.keyPoint || "No key point")}</h3>
       </div>
       <div class="beta-card-meta">
         <span>${escapeHtml(record.version || "-")}</span>
         <span>${escapeHtml(record.testItem || "-")}</span>
         <span>${escapeHtml(record.testType || "-")}</span>
+        <span>${escapeHtml(record.testerOwner || "-")}</span>
       </div>
       <div class="beta-card-chips">${chips}</div>
       <p class="beta-next-action">${escapeHtml(record.nextAction || record.notes || "-")}</p>
@@ -892,7 +894,6 @@ async function copyText(text) {
 }
 
 function openBetaDetail(record) {
-  document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
     <div class="detail-panel__header">
@@ -903,7 +904,7 @@ function openBetaDetail(record) {
           ${record.status ? `<span class="status-pill">${escapeHtml(record.status)}</span>` : ""}
         </div>
         <p class="beta-detail-heading">${escapeHtml(betaDetailHeading(record) || "Beta test detail")}</p>
-        <h2>${escapeHtml(record.keyPoint || record.issueFound || "Beta test detail")}</h2>
+        <h2>${escapeHtml(record.keyPoint || "No key point")}</h2>
       </div>
       <div class="detail-actions">
         <button class="copy-beta-detail" type="button">Copy Full Info</button>
@@ -986,7 +987,6 @@ function openBetaDetail(record) {
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
     elements.detail.classList.add("is-hidden");
-    document.body.classList.remove("detail-open");
   });
 }
 
@@ -1482,7 +1482,7 @@ function betaPayloadFromInput() {
     "Resolved Date": "",
     "Related Request Number": "",
     "Related Firmware Version": elements.betaInputVersion.value.trim(),
-    Notes: "",
+    Notes: elements.betaInputNotes.value.trim(),
     "Raw Input": elements.betaRawInput.value.trim(),
   };
 }
@@ -1528,7 +1528,6 @@ function analyzeBetaInput() {
     elements.betaInputTesterOwner.value = draft.testerOwner;
   }
   elements.betaInputIssueFound.value = draft.issueFound;
-  elements.betaInputKeyPoint.value = draft.keyPoint;
   elements.betaInputSeverity.value = draft.severity;
   elements.betaInputPriority.value = draft.priority;
   elements.betaInputStatus.value = draft.status;
