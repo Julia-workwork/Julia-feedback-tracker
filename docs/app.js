@@ -275,6 +275,18 @@ function isAdmin() {
   return String(state.auth?.role || "").trim() === "Admin";
 }
 
+function isViewerRole() {
+  return String(state.auth?.role || "").trim() === "Viewer";
+}
+
+function hideIdentityInOperationalView() {
+  return isViewerRole() && state.activeView !== "feedback";
+}
+
+function privateIdentityText(value) {
+  return hideIdentityInOperationalView() ? "-" : value;
+}
+
 function updateBetaInputAccess() {
   if (!elements.betaInputPanel || !elements.betaInputForm) return;
   const allowed = canEdit("beta");
@@ -796,6 +808,9 @@ function dateSortValue(value) {
 }
 
 function betaRecordTemplate(record, index) {
+  const testerOwner = hideIdentityInOperationalView()
+    ? ""
+    : `<strong>${escapeHtml(record.testerOwner || "-")}</strong>`;
   const chips = [
     record.severity ? `<span class="severity-pill ${betaSeverityClass(record.severity)}">${escapeHtml(record.severity)}</span>` : "",
     record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : "",
@@ -808,7 +823,7 @@ function betaRecordTemplate(record, index) {
       <div class="beta-card-date">
         <strong>${escapeHtml(record.date || "-")}</strong>
         <strong>${escapeHtml(record.productModel || "-")}</strong>
-        <strong>${escapeHtml(record.testerOwner || "-")}</strong>
+        ${testerOwner}
       </div>
       <div class="beta-card-main">
         <p>${escapeHtml(record.testItem || "-")}</p>
@@ -850,14 +865,13 @@ function betaEditableRow(record, header, value, fieldHtml, size = "medium") {
 }
 
 function betaFullDetail(record) {
-  return [
+  const rows = [
     `Date: ${record.date || "-"}`,
     `Product Model: ${record.productModel || "-"}`,
     `Version: ${record.version || "-"}`,
     `Test Item: ${record.testItem || "-"}`,
     `Test Type: ${record.testType || "-"}`,
     `Tester Type: ${record.testerType || "-"}`,
-    `Tester / Owner: ${record.testerOwner || "-"}`,
     `Issue Source: ${record.issueSource || "-"}`,
     `Key Point: ${record.keyPoint || "-"}`,
     `Issue Found: ${record.issueFound || "-"}`,
@@ -873,7 +887,11 @@ function betaFullDetail(record) {
     `Related Firmware Version: ${record.relatedFirmwareVersion || "-"}`,
     `Process Follow-up: ${record.notes || "-"}`,
     `Edit Log: ${record.editLog || "-"}`,
-  ].join("\n");
+  ];
+  if (!hideIdentityInOperationalView()) {
+    rows.splice(6, 0, `Tester / Owner: ${record.testerOwner || "-"}`);
+  }
+  return rows.join("\n");
 }
 
 async function copyText(text) {
@@ -928,7 +946,7 @@ function openBetaDetail(record) {
         record.testerType,
         betaSelectTemplate("Tester Type", record.testerType, selectOptionsFromRecords(state.betaRecords, "testerType", BETA_TESTER_TYPE_OPTIONS)),
       )}
-      ${detailRow("Tester / Owner", record.testerOwner)}
+      ${hideIdentityInOperationalView() ? "" : detailRow("Tester / Owner", record.testerOwner)}
       ${betaEditableRow(
         record,
         "Issue Source",
@@ -1798,7 +1816,7 @@ function requestMatchesTemplate(records) {
           (record, index) => `
             <button type="button" data-match-index="${index}">
               <strong>${escapeHtml(record.keyPoints || record.upgradeRequirements || "Feedback detail")}</strong>
-              <span>${escapeHtml([record.date, record.model, record.id].filter(Boolean).join(" · ") || "-")}</span>
+              <span>${escapeHtml([record.date, record.model, privateIdentityText(record.id)].filter(Boolean).join(" · ") || "-")}</span>
             </button>
           `,
         )
@@ -1871,7 +1889,7 @@ function detailHeaderTagsTemplate(record) {
 }
 
 function detailSummaryTemplate(record) {
-  const meta = [record.requestNumber, record.date, record.id].filter(Boolean).join(" · ");
+  const meta = [record.requestNumber, record.date, privateIdentityText(record.id)].filter(Boolean).join(" · ");
   return `
     <section class="detail-summary-card">
       <div class="card-meta">
@@ -1908,9 +1926,9 @@ function openDetail(record) {
       ${permissionAwareDetailRow("Notes", record.notes, `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
       ${modificationRowsTemplate(record)}
       ${detailRow("Model", record.model)}
-      ${detailRow("User ID", record.id)}
-      ${detailRow("Email", record.email)}
-      ${detailRow("Profile", record.profile)}
+      ${hideIdentityInOperationalView() ? "" : detailRow("User ID", record.id)}
+      ${hideIdentityInOperationalView() ? "" : detailRow("Email", record.email)}
+      ${hideIdentityInOperationalView() ? "" : detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
     </dl>
