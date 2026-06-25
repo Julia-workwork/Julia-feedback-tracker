@@ -806,11 +806,8 @@ function betaRecordTemplate(record, index) {
   return `
     <article class="beta-card" data-beta-index="${index}" role="button" tabindex="0">
       <div class="beta-card-date">
-        <p>Date</p>
         <strong>${escapeHtml(record.date || "-")}</strong>
-        <p>Model</p>
         <strong>${escapeHtml(record.productModel || "-")}</strong>
-        <p>Tester / Owner</p>
         <strong>${escapeHtml(record.testerOwner || "-")}</strong>
       </div>
       <div class="beta-card-main">
