@@ -275,12 +275,8 @@ function isAdmin() {
   return String(state.auth?.role || "").trim() === "Admin";
 }
 
-function isViewerRole() {
-  return String(state.auth?.role || "").trim() === "Viewer";
-}
-
 function hideIdentityInOperationalView() {
-  return isViewerRole() && state.activeView !== "feedback";
+  return !isAdmin() && state.activeView !== "feedback";
 }
 
 function privateIdentityText(value) {
