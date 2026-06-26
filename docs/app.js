@@ -279,8 +279,12 @@ function hideIdentityInOperationalView() {
   return !isAdmin() && state.activeView !== "feedback";
 }
 
-function privateIdentityText(value) {
-  return hideIdentityInOperationalView() ? "-" : value;
+function hideIdentityForDetail(options = {}) {
+  return !isAdmin() && options.source !== "feedback";
+}
+
+function privateIdentityText(value, options = {}) {
+  return hideIdentityForDetail(options) ? "-" : value;
 }
 
 function updateBetaInputAccess() {
@@ -1803,7 +1807,7 @@ function feedbackForRequestNumber(requestNumber) {
   return state.records.filter((record) => normalizeRequestNumber(record.requestNumber) === key);
 }
 
-function requestMatchesTemplate(records) {
+function requestMatchesTemplate(records, options = {}) {
   return `
     <section class="request-match-picker">
       <h3>Matching Feedback</h3>
@@ -1812,7 +1816,7 @@ function requestMatchesTemplate(records) {
           (record, index) => `
             <button type="button" data-match-index="${index}">
               <strong>${escapeHtml(record.keyPoints || record.upgradeRequirements || "Feedback detail")}</strong>
-              <span>${escapeHtml([record.date, record.model, privateIdentityText(record.id)].filter(Boolean).join(" · ") || "-")}</span>
+              <span>${escapeHtml([record.date, record.model, privateIdentityText(record.id, options)].filter(Boolean).join(" · ") || "-")}</span>
             </button>
           `,
         )
@@ -1821,7 +1825,7 @@ function requestMatchesTemplate(records) {
   `;
 }
 
-function openRequestMatches(records) {
+function openRequestMatches(records, options = {}) {
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
@@ -1833,11 +1837,11 @@ function openRequestMatches(records) {
         <button type="button" id="close-detail">Close</button>
       </div>
     </div>
-    ${requestMatchesTemplate(records)}
+    ${requestMatchesTemplate(records, options)}
   `;
   elements.detail.querySelectorAll("[data-match-index]").forEach((button) => {
     button.addEventListener("click", () => {
-      openDetail(records[Number(button.dataset.matchIndex)]);
+      openDetail(records[Number(button.dataset.matchIndex)], options);
     });
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
@@ -1884,8 +1888,8 @@ function detailHeaderTagsTemplate(record) {
   `;
 }
 
-function detailSummaryTemplate(record) {
-  const meta = [record.requestNumber, record.date, privateIdentityText(record.id)].filter(Boolean).join(" · ");
+function detailSummaryTemplate(record, options = {}) {
+  const meta = [record.requestNumber, record.date, privateIdentityText(record.id, options)].filter(Boolean).join(" · ");
   return `
     <section class="detail-summary-card">
       <div class="card-meta">
@@ -1898,7 +1902,8 @@ function detailSummaryTemplate(record) {
   `;
 }
 
-function openDetail(record) {
+function openDetail(record, options = { source: "feedback" }) {
+  const shouldHideIdentity = hideIdentityForDetail(options);
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
@@ -1909,7 +1914,7 @@ function openDetail(record) {
         <button type="button" id="close-detail">Close</button>
       </div>
     </div>
-    ${detailSummaryTemplate(record)}
+    ${detailSummaryTemplate(record, options)}
     <dl class="detail-list">
       ${linkedFirmwareTemplate(record)}
       ${detailRow("Original Feedback", record.upgradeRequirements)}
@@ -1922,9 +1927,9 @@ function openDetail(record) {
       ${permissionAwareDetailRow("Notes", record.notes, `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
       ${modificationRowsTemplate(record)}
       ${detailRow("Model", record.model)}
-      ${hideIdentityInOperationalView() ? "" : detailRow("User ID", record.id)}
-      ${hideIdentityInOperationalView() ? "" : detailRow("Email", record.email)}
-      ${hideIdentityInOperationalView() ? "" : detailRow("Profile", record.profile)}
+      ${shouldHideIdentity ? "" : detailRow("User ID", record.id)}
+      ${shouldHideIdentity ? "" : detailRow("Email", record.email)}
+      ${shouldHideIdentity ? "" : detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
     </dl>
@@ -2360,10 +2365,10 @@ elements.firmwareList.addEventListener("click", (event) => {
       return;
     }
     if (matches.length === 1) {
-      openDetail(matches[0]);
+      openDetail(matches[0], { source: "firmware" });
       return;
     }
-    openRequestMatches(matches);
+    openRequestMatches(matches, { source: "firmware" });
     return;
   }
 
