@@ -280,7 +280,7 @@ function hideIdentityInOperationalView() {
 }
 
 function hideIdentityForDetail(options = {}) {
-  return !isAdmin() && options.source !== "feedback";
+  return !isAdmin();
 }
 
 function privateIdentityText(value, options = {}) {
@@ -1080,7 +1080,7 @@ function renderBoard(records) {
 }
 
 function engineerSummary(record) {
-  return [
+  const rows = [
     `Model: ${record.model || "-"}`,
     `Category: ${record.updateCategory || "-"}`,
     `Priority: ${record.priority || "-"}`,
@@ -1092,8 +1092,11 @@ function engineerSummary(record) {
     `Chinese: ${record.chinese || "-"}`,
     `Notes: ${record.notes || "-"}`,
     `Channel: ${record.channel || "-"}`,
-    `User ID: ${record.id || "-"}`,
-  ].join("\n");
+  ];
+  if (isAdmin()) {
+    rows.push(`User ID: ${record.id || "-"}`);
+  }
+  return rows.join("\n");
 }
 
 async function copyEngineerSummary(record) {
