@@ -2365,7 +2365,7 @@ elements.firmwareList.addEventListener("click", (event) => {
   const titleButton = event.target.closest(".firmware-title-toggle");
   if (titleButton) {
     const details = titleButton.closest(".firmware-card")?.querySelector(".firmware-details");
-    if (details) details.open = true;
+    if (details) details.open = !details.open;
     return;
   }
 
