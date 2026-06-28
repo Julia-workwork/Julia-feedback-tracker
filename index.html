@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Engineering Follow-up Dashboard</title>
+    <link rel="stylesheet" href="./styles.css?v=20260628-firmware-title-click" />
+  </head>
+  <body>
+    <section id="login-screen" class="login-screen">
+      <form id="login-form" class="login-card">
+        <p class="eyebrow">Julia's Feedback Tracker</p>
+        <h1>Engineering Follow-up Dashboard</h1>
+        <p>Private internal tool. Sign in to continue.</p>
+        <label>
+          Account
+          <input id="login-username" name="username" autocomplete="username" required />
+        </label>
+        <label>
+          Password
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Sign in</button>
+        <p id="login-message" class="login-message" role="status"></p>
+      </form>
+    </section>
+
+    <main class="app-shell is-hidden">
+      <header class="app-header">
+        <nav class="hero-nav view-switch" aria-label="Dashboard sections">
+          <button class="view-tab is-active" type="button" data-view="feedback" aria-pressed="true">Feedback Board</button>
+          <button class="view-tab" type="button" data-view="firmware" aria-pressed="false">Firmware Change Log</button>
+          <button class="view-tab" type="button" data-view="beta" aria-pressed="false">Beta Test Progress</button>
+          <span>Data Sync <b aria-hidden="true"></b></span>
+          <span id="auth-role">Viewer</span>
+          <button id="logout-button" class="logout-button" type="button">Log out</button>
+        </nav>
+        <div class="hero-copy">
+          <p id="hero-eyebrow" class="eyebrow">Julia's Feedback Tracker</p>
+          <h1 id="hero-title">Engineering Follow-up Dashboard</h1>
+          <p id="hero-note" class="private-note">Private internal tool owned by Julia. Personal workflow only.</p>
+        </div>
+      </header>
+
+      <section id="feedback-view" class="dashboard-view" data-view-panel="feedback">
+        <section class="filter-bar" aria-label="Dashboard filters">
+          <label>
+            Product Model
+            <select id="model-filter">
+              <option value="all">All Models</option>
+            </select>
+          </label>
+          <label class="search-field">
+            Keyword Search
+            <input id="search-filter" placeholder="Search feedback, requests, notes..." />
+          </label>
+          <label class="advanced-filter">
+            Update Category
+            <select id="category-filter">
+              <option value="">All Categories</option>
+              <option value="BUG">BUG</option>
+              <option value="Feature Request">Feature Request</option>
+              <option value="Feature Enhancement">Feature Enhancement</option>
+              <option value="Positive review">Positive review</option>
+              <option value="Negative review">Negative review</option>
+              <option value="CPS">CPS</option>
+              <option value="APP">APP</option>
+            </select>
+          </label>
+          <label class="advanced-filter">
+            Priority
+            <select id="priority-filter">
+              <option value="">All Priorities</option>
+              <option value="P0">P0</option>
+              <option value="P1">P1</option>
+              <option value="P2">P2</option>
+            </select>
+          </label>
+          <fieldset class="date-range-filter advanced-filter">
+            <legend>Date Range</legend>
+            <label>
+              From Date
+              <input id="date-from-filter" type="date" />
+            </label>
+            <label>
+              To Date
+              <input id="date-to-filter" type="date" />
+            </label>
+          </fieldset>
+          <button id="filter-more-toggle" class="filter-more-toggle" type="button" aria-expanded="false">More Filters</button>
+          <button id="refresh-button" type="button">Refresh</button>
+        </section>
+
+        <section class="feedback-action-bar" aria-label="Feedback actions">
+          <button id="feedback-add-button" class="add-record-button" type="button" hidden>+ Add Feedback</button>
+        </section>
+
+        <section id="feedback-input-panel" class="quick-input-panel feedback-input-panel is-hidden" aria-label="Quick feedback input" hidden>
+          <div class="quick-input-summary">
+            <div>
+              <p class="eyebrow">Admin Feedback Input</p>
+              <h2>Add user feedback</h2>
+              <p>Create a new record in FW update suggestion&amp;Reqs.</p>
+            </div>
+            <button id="feedback-close-button" class="quick-input-toggle" type="button">Close input</button>
+          </div>
+          <form id="feedback-input-form" class="beta-input-form feedback-input-form">
+            <label class="beta-raw-field feedback-wide-field">
+              Raw Input
+              <textarea id="feedback-raw-input" rows="5" placeholder="Paste user original words, date, model, channel, user name, or other scattered info..."></textarea>
+            </label>
+            <div class="beta-input-grid">
+              <label>
+                Date
+                <input id="feedback-input-date" type="date" />
+              </label>
+              <label>
+                Product Model
+                <input id="feedback-input-model" placeholder="HA2, HD1, H1..." />
+              </label>
+              <label>
+                User ID
+                <input id="feedback-input-id" placeholder="User name or account" />
+              </label>
+              <label>
+                Email
+                <input id="feedback-input-email" type="email" placeholder="user@example.com" />
+              </label>
+              <label>
+                Update Category
+                <input id="feedback-input-category" placeholder="BUG, Feature Request..." />
+              </label>
+              <label>
+                Priority
+                <select id="feedback-input-priority">
+                  <option value="">-</option>
+                  <option>P0</option>
+                  <option>P1</option>
+                  <option selected>P2</option>
+                </select>
+              </label>
+              <label>
+                Request number
+                <input id="feedback-input-request" placeholder="RT20260620001" />
+              </label>
+              <label>
+                Channel
+                <input id="feedback-input-channel" placeholder="Email, Facebook, WhatsApp..." />
+              </label>
+              <label>
+                Status
+                <select id="feedback-input-status">
+                  <option selected>To Submit</option>
+                  <option>Submitted</option>
+                  <option>In Progress</option>
+                  <option>Resolved</option>
+                </select>
+              </label>
+            </div>
+            <details id="feedback-generated-fields" class="feedback-generated-fields">
+              <summary>
+                <span>Generated fields</span>
+                <small>Key Points, Original Feedback, Chinese, Notes</small>
+              </summary>
+              <div class="feedback-generated-grid">
+                <label class="beta-raw-field feedback-wide-field">
+                  Key Points
+                  <textarea id="feedback-input-key-points" rows="3" placeholder="Engineer-ready key point..."></textarea>
+                </label>
+                <label class="beta-raw-field feedback-wide-field">
+                  Original Feedback
+                  <textarea id="feedback-input-upgrade" rows="4" placeholder="Paste user original feedback..."></textarea>
+                </label>
+                <label class="beta-raw-field feedback-wide-field">
+                  Chinese
+                  <textarea id="feedback-input-chinese" rows="4" placeholder="Chinese translation of the original feedback..."></textarea>
+                </label>
+                <label class="beta-raw-field feedback-wide-field">
+                  Notes
+                  <textarea id="feedback-input-notes" rows="3" placeholder="Internal notes..."></textarea>
+                </label>
+              </div>
+            </details>
+            <div class="quick-input-actions">
+              <button id="feedback-analyze-button" type="button">Analyze</button>
+              <button id="feedback-save-button" type="submit">Save to Sheet</button>
+              <button id="feedback-clear-button" type="button">Clear</button>
+            </div>
+            <p id="feedback-input-message" class="state-message is-hidden"></p>
+          </form>
+        </section>
+
+        <section id="summary" class="summary-strip" aria-label="Feedback summary"></section>
+        <p id="state-message" class="state-message">Loading feedback data...</p>
+        <section id="board" class="status-board" aria-label="Engineering follow-up board"></section>
+      </section>
+
+      <section id="firmware-view" class="dashboard-view is-hidden" data-view-panel="firmware">
+        <section class="module-filter-toggle" aria-label="Firmware filter controls">
+          <div>
+            <p>Firmware Filters</p>
+            <span id="firmware-filter-summary">All Models · All Versions · No date range</span>
+          </div>
+          <button id="firmware-filter-toggle" type="button" aria-expanded="false" aria-controls="firmware-filter-bar">Show filters</button>
+        </section>
+        <section id="firmware-filter-bar" class="filter-bar firmware-filter-bar is-collapsed" aria-label="Firmware filters">
+          <label>
+            Product Model
+            <select id="firmware-model-filter">
+              <option value="all">All Models</option>
+            </select>
+          </label>
+          <label>
+            Firmware Version
+            <select id="firmware-version-filter">
+              <option value="all">All Versions</option>
+            </select>
+          </label>
+          <label class="search-field">
+            Keyword Search
+            <input id="firmware-search-filter" placeholder="Search firmware logs, versions, closed requests..." />
+          </label>
+          <fieldset class="date-range-filter">
+            <legend>Date Range</legend>
+            <label>
+              From Date
+              <input id="firmware-date-from-filter" type="date" />
+            </label>
+            <label>
+              To Date
+              <input id="firmware-date-to-filter" type="date" />
+            </label>
+          </fieldset>
+          <button id="firmware-refresh-button" type="button">Refresh</button>
+        </section>
+        <section id="firmware-summary" class="firmware-summary" aria-label="Firmware release summary"></section>
+        <p id="firmware-message" class="state-message is-hidden"></p>
+        <section id="firmware-list" class="firmware-list" aria-label="Firmware change log"></section>
+      </section>
+
+      <section id="beta-view" class="dashboard-view is-hidden" data-view-panel="beta">
+        <details id="beta-input-panel" class="quick-input-panel" aria-label="Quick beta test input">
+          <summary class="quick-input-summary">
+            <div>
+              <p class="eyebrow">Admin Beta Input</p>
+              <h2>Add beta test note</h2>
+              <p>Paste, analyze, review, then save it to Beta Test Progress.</p>
+            </div>
+            <span class="quick-input-toggle">input</span>
+          </summary>
+          <form id="beta-input-form" class="beta-input-form">
+            <label class="beta-raw-field">
+              Raw Input
+              <textarea id="beta-raw-input" rows="5" placeholder="Paste beta test notes, user test feedback, daily progress, or internal QA findings..."></textarea>
+            </label>
+            <div class="beta-input-grid">
+              <label>
+                Date
+                <input id="beta-input-date" type="date" />
+              </label>
+              <label>
+                Product Model
+                <input id="beta-input-model" placeholder="HA2, HD1, H1..." />
+              </label>
+              <label>
+                Version
+                <input id="beta-input-version" placeholder="V1.00.05.004" />
+              </label>
+              <label>
+                Test Item
+                <input id="beta-input-test-item" placeholder="APRS mute, TX audio, GPS, UI..." />
+              </label>
+              <label>
+                Test Type
+                <select id="beta-input-test-type">
+                  <option value="">-</option>
+                  <option>Firmware</option>
+                  <option>APP</option>
+                  <option>CPS</option>
+                  <option>Hardware</option>
+                  <option>Accessory</option>
+                </select>
+              </label>
+              <label>
+                Tester Type
+                <select id="beta-input-tester-type">
+                  <option value="">-</option>
+                  <option>Internal Test</option>
+                  <option>User Beta Test</option>
+                  <option>Engineer Test</option>
+                  <option>KOC Test</option>
+                </select>
+              </label>
+              <label>
+                Tester / Owner
+                <input id="beta-input-tester-owner" placeholder="Julia, user name, engineer..." />
+              </label>
+            </div>
+            <div id="beta-draft-fields" class="beta-draft-grid">
+              <label>
+                Issue Found
+                <textarea id="beta-input-issue-found" rows="2"></textarea>
+              </label>
+              <label>
+                Key Point
+                <textarea id="beta-input-key-point" rows="2"></textarea>
+              </label>
+              <label>
+                Severity
+                <select id="beta-input-severity">
+                  <option>Critical</option>
+                  <option>High</option>
+                  <option selected>Medium</option>
+                  <option>Low</option>
+                </select>
+              </label>
+              <label>
+                Priority
+                <select id="beta-input-priority">
+                  <option value="">-</option>
+                  <option>P0</option>
+                  <option>P1</option>
+                  <option selected>P2</option>
+                </select>
+              </label>
+              <label>
+                Status
+                <select id="beta-input-status">
+                  <option>Open</option>
+                  <option>Need Review</option>
+                  <option>Reproducing</option>
+                  <option>In Progress</option>
+                  <option>Resolved</option>
+                  <option>Closed</option>
+                </select>
+              </label>
+              <label>
+                Next Action
+                <textarea id="beta-input-next-action" rows="2"></textarea>
+              </label>
+              <label>
+                Process Follow-up
+                <textarea id="beta-input-notes" rows="2" placeholder="Follow-up notes, validation progress, reminders..."></textarea>
+              </label>
+            </div>
+            <div class="quick-input-actions">
+              <button id="beta-analyze-button" type="button">Analyze</button>
+              <button id="beta-save-button" type="submit">Save to Sheet</button>
+              <button id="beta-clear-button" type="button">Clear</button>
+            </div>
+            <p id="beta-input-message" class="state-message is-hidden"></p>
+          </form>
+        </details>
+
+        <section class="module-filter-toggle" aria-label="Beta test filter controls">
+          <div>
+            <p>Beta Filters</p>
+            <span id="beta-filter-summary">All Models · All Versions · All Statuses</span>
+          </div>
+          <button id="beta-filter-toggle" type="button" aria-expanded="false" aria-controls="beta-filter-bar">Show filters</button>
+        </section>
+        <section id="beta-filter-bar" class="filter-bar beta-filter-bar is-collapsed" aria-label="Beta test filters">
+          <label>
+            Product Model
+            <select id="beta-model-filter">
+              <option value="all">All Models</option>
+            </select>
+          </label>
+          <label>
+            Version
+            <select id="beta-version-filter">
+              <option value="all">All Versions</option>
+            </select>
+          </label>
+          <label>
+            Tester Type
+            <select id="beta-tester-type-filter">
+              <option value="">All Tester Types</option>
+              <option>Internal Test</option>
+              <option>User Beta Test</option>
+              <option>Engineer Test</option>
+              <option>KOC Test</option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select id="beta-status-filter">
+              <option value="">All Statuses</option>
+              <option>Open</option>
+              <option>Need Review</option>
+              <option>Reproducing</option>
+              <option>In Progress</option>
+              <option>Resolved</option>
+              <option>Closed</option>
+            </select>
+          </label>
+          <label>
+            Priority
+            <select id="beta-priority-filter">
+              <option value="">All Priorities</option>
+              <option>P0</option>
+              <option>P1</option>
+              <option>P2</option>
+            </select>
+          </label>
+          <label class="search-field">
+            Keyword Search
+            <input id="beta-search-filter" placeholder="Search beta issues, owners, raw input..." />
+          </label>
+          <fieldset class="date-range-filter">
+            <legend>Date Range</legend>
+            <label>
+              From Date
+              <input id="beta-date-from-filter" type="date" />
+            </label>
+            <label>
+              To Date
+              <input id="beta-date-to-filter" type="date" />
+            </label>
+          </fieldset>
+          <button id="beta-refresh-button" type="button">Refresh</button>
+        </section>
+        <section id="beta-summary" class="beta-summary" aria-label="Beta test summary"></section>
+        <p id="beta-message" class="state-message is-hidden"></p>
+        <section id="beta-list" class="beta-list" aria-label="Beta test progress records"></section>
+      </section>
+      <footer class="app-footer">
+        © 2026 Julia. All rights reserved. This dashboard is a personal internal tool created for Julia's private workflow. It may not be copied, redistributed, commercialized, or used by any third party without permission.
+      </footer>
+    </main>
+
+    <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
+    <script type="module" src="./app.js?v=20260628-firmware-title-click"></script>
+  </body>
+</html>
