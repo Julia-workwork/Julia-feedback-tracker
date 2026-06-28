@@ -710,8 +710,10 @@ function firmwareCardTemplate(release, index) {
   return `
     <article class="firmware-card">
       <div class="firmware-title">
-        <p>${escapeHtml(release.model || "-")}</p>
-        <h2>${escapeHtml(release.version || "Unknown version")}</h2>
+        <button class="firmware-title-toggle" type="button" data-release-index="${index}" aria-label="Open firmware details for ${escapeHtml(release.version || "Unknown version")}">
+          <p>${escapeHtml(release.model || "-")}</p>
+          <h2>${escapeHtml(release.version || "Unknown version")}</h2>
+        </button>
       </div>
       ${
         metadata.length
@@ -2360,6 +2362,13 @@ elements.betaInputForm.addEventListener("submit", async (event) => {
   await saveBetaInput();
 });
 elements.firmwareList.addEventListener("click", (event) => {
+  const titleButton = event.target.closest(".firmware-title-toggle");
+  if (titleButton) {
+    const details = titleButton.closest(".firmware-card")?.querySelector(".firmware-details");
+    if (details) details.open = true;
+    return;
+  }
+
   const requestButton = event.target.closest(".closed-request-link");
   if (requestButton) {
     const matches = feedbackForRequestNumber(requestButton.dataset.requestNumber);

@@ -1141,6 +1141,24 @@ body {
   text-transform: uppercase;
 }
 
+.firmware-title-toggle {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.firmware-title-toggle:focus-visible {
+  border-radius: 8px;
+  outline: 3px solid rgba(8, 116, 242, 0.32);
+  outline-offset: 5px;
+}
+
 .firmware-card h2 {
   margin: 0;
   font-family: var(--summary-number-font);
