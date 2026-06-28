@@ -91,6 +91,7 @@ const state = {
   firmwareRecords: [],
   betaRecords: [],
   firmwareLookup: new Map(),
+  currentDetailRecord: null,
   activeView: "feedback",
   summaryFilter: "",
   filters: {
@@ -914,6 +915,7 @@ async function copyText(text) {
 }
 
 function openBetaDetail(record) {
+  state.currentDetailRecord = null;
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
     <div class="detail-panel__header">
@@ -1006,7 +1008,7 @@ function openBetaDetail(record) {
     }
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
-    elements.detail.classList.add("is-hidden");
+    closeDetail();
   });
 }
 
@@ -1060,6 +1062,10 @@ function renderBoard(records) {
     button.addEventListener("click", (event) => {
       if (event.target.closest(".copy-summary")) return;
       const record = records[Number(button.dataset.index)];
+      if (isDetailOpenForRecord(record)) {
+        closeDetail();
+        return;
+      }
       openDetail(record);
     });
     button.addEventListener("keydown", (event) => {
@@ -1067,6 +1073,10 @@ function renderBoard(records) {
       if (event.target.closest(".copy-summary")) return;
       event.preventDefault();
       const record = records[Number(button.dataset.index)];
+      if (isDetailOpenForRecord(record)) {
+        closeDetail();
+        return;
+      }
       openDetail(record);
     });
   });
@@ -1831,6 +1841,7 @@ function requestMatchesTemplate(records, options = {}) {
 }
 
 function openRequestMatches(records, options = {}) {
+  state.currentDetailRecord = null;
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
@@ -1850,8 +1861,7 @@ function openRequestMatches(records, options = {}) {
     });
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
-    elements.detail.classList.add("is-hidden");
-    document.body.classList.remove("detail-open");
+    closeDetail();
   });
 }
 
@@ -1909,6 +1919,7 @@ function detailSummaryTemplate(record, options = {}) {
 
 function openDetail(record, options = { source: "feedback" }) {
   const shouldHideIdentity = hideIdentityForDetail(options);
+  state.currentDetailRecord = record;
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
@@ -1966,15 +1977,23 @@ function openDetail(record, options = { source: "feedback" }) {
     setDetailSaving(false);
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
-    elements.detail.classList.add("is-hidden");
-    document.body.classList.remove("detail-open");
+    closeDetail();
   });
+}
+
+function closeDetail() {
+  elements.detail.classList.add("is-hidden");
+  document.body.classList.remove("detail-open");
+  state.currentDetailRecord = null;
+}
+
+function isDetailOpenForRecord(record) {
+  return state.currentDetailRecord === record && !elements.detail.classList.contains("is-hidden");
 }
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || elements.detail.classList.contains("is-hidden")) return;
-  elements.detail.classList.add("is-hidden");
-  document.body.classList.remove("detail-open");
+  closeDetail();
 });
 
 function render() {
