@@ -1586,9 +1586,9 @@ body {
 .beta-input-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  gap: 16px;
   border-top: 1px solid rgb(255 255 255 / 12%);
-  padding: 24px 28px 28px;
+  padding: 22px 28px 26px;
 }
 
 .feedback-input-form > .feedback-wide-field,
@@ -1639,20 +1639,68 @@ body {
   background: #eafffc;
 }
 
-.beta-input-grid,
+.beta-input-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(170px, 0.75fr) minmax(260px, 1.15fr) minmax(240px, 1fr)
+    minmax(280px, 1.2fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.beta-field-test-item {
+  grid-column: span 2;
+}
+
+.beta-field-test-type,
+.beta-field-tester-type {
+  grid-column: span 1;
+}
+
+.beta-field-owner {
+  grid-column: span 2;
+}
+
 .beta-draft-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.9fr) minmax(150px, 0.42fr) minmax(150px, 0.42fr);
   gap: 12px;
+  align-items: end;
 }
 
-.beta-draft-grid {
-  grid-template-columns: minmax(0, 1.4fr) minmax(120px, 0.55fr) minmax(120px, 0.55fr) minmax(140px, 0.7fr);
-}
-
-.beta-draft-grid label:first-child,
-.beta-draft-grid label:last-child {
+.beta-field-issue {
   grid-column: span 2;
+}
+
+.beta-field-key-point {
+  grid-column: span 1;
+}
+
+.beta-field-severity {
+  grid-column: span 1;
+}
+
+.beta-field-priority,
+.beta-field-status {
+  grid-column: span 1;
+}
+
+.beta-field-next-action,
+.beta-field-follow-up {
+  grid-column: span 2;
+}
+
+.beta-field-issue textarea,
+.beta-field-key-point textarea,
+.beta-field-next-action textarea,
+.beta-field-follow-up textarea {
+  min-height: 86px;
+}
+
+.beta-field-next-action textarea,
+.beta-field-follow-up textarea {
+  border-color: rgba(242, 194, 48, 0.72);
+  background: #fffaf0;
 }
 
 .quick-input-actions {
@@ -1976,6 +2024,18 @@ body {
     grid-column: auto;
   }
 
+  .beta-field-test-item,
+  .beta-field-owner,
+  .beta-field-issue,
+  .beta-field-key-point,
+  .beta-field-severity,
+  .beta-field-priority,
+  .beta-field-status,
+  .beta-field-next-action,
+  .beta-field-follow-up {
+    grid-column: auto;
+  }
+
   .beta-card-date {
     border-right: 0;
     border-bottom: 1px solid #e6ebf2;
@@ -2042,6 +2102,18 @@ body {
     .firmware-card,
     .date-range-filter {
     grid-template-columns: 1fr;
+  }
+
+  .beta-field-test-item,
+  .beta-field-owner,
+  .beta-field-issue,
+  .beta-field-key-point,
+  .beta-field-severity,
+  .beta-field-priority,
+  .beta-field-status,
+  .beta-field-next-action,
+  .beta-field-follow-up {
+    grid-column: auto;
   }
 
   .filter-bar > #refresh-button,

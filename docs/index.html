@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Engineering Follow-up Dashboard</title>
-    <link rel="stylesheet" href="./styles.css?v=20260628-firmware-title-click" />
+    <link rel="stylesheet" href="./styles.css?v=20260702-beta-input-layout" />
   </head>
   <body>
     <section id="login-screen" class="login-screen">
@@ -254,23 +254,23 @@
               <textarea id="beta-raw-input" rows="5" placeholder="Paste beta test notes, user test feedback, daily progress, or internal QA findings..."></textarea>
             </label>
             <div class="beta-input-grid">
-              <label>
+              <label class="beta-field-date">
                 Date
                 <input id="beta-input-date" type="date" />
               </label>
-              <label>
+              <label class="beta-field-model">
                 Product Model
                 <input id="beta-input-model" placeholder="HA2, HD1, H1..." />
               </label>
-              <label>
+              <label class="beta-field-version">
                 Version
                 <input id="beta-input-version" placeholder="V1.00.05.004" />
               </label>
-              <label>
+              <label class="beta-field-test-item">
                 Test Item
                 <input id="beta-input-test-item" placeholder="APRS mute, TX audio, GPS, UI..." />
               </label>
-              <label>
+              <label class="beta-field-test-type">
                 Test Type
                 <select id="beta-input-test-type">
                   <option value="">-</option>
@@ -281,7 +281,7 @@
                   <option>Accessory</option>
                 </select>
               </label>
-              <label>
+              <label class="beta-field-tester-type">
                 Tester Type
                 <select id="beta-input-tester-type">
                   <option value="">-</option>
@@ -291,21 +291,21 @@
                   <option>KOC Test</option>
                 </select>
               </label>
-              <label>
+              <label class="beta-field-owner">
                 Tester / Owner
                 <input id="beta-input-tester-owner" placeholder="Julia, user name, engineer..." />
               </label>
             </div>
             <div id="beta-draft-fields" class="beta-draft-grid">
-              <label>
+              <label class="beta-field-issue">
                 Issue Found
-                <textarea id="beta-input-issue-found" rows="2"></textarea>
+                <textarea id="beta-input-issue-found" rows="3"></textarea>
               </label>
-              <label>
+              <label class="beta-field-key-point">
                 Key Point
-                <textarea id="beta-input-key-point" rows="2"></textarea>
+                <textarea id="beta-input-key-point" rows="3"></textarea>
               </label>
-              <label>
+              <label class="beta-field-severity">
                 Severity
                 <select id="beta-input-severity">
                   <option>Critical</option>
@@ -314,7 +314,7 @@
                   <option>Low</option>
                 </select>
               </label>
-              <label>
+              <label class="beta-field-priority">
                 Priority
                 <select id="beta-input-priority">
                   <option value="">-</option>
@@ -323,7 +323,7 @@
                   <option selected>P2</option>
                 </select>
               </label>
-              <label>
+              <label class="beta-field-status">
                 Status
                 <select id="beta-input-status">
                   <option>Open</option>
@@ -334,13 +334,13 @@
                   <option>Closed</option>
                 </select>
               </label>
-              <label>
+              <label class="beta-field-next-action">
                 Next Action
-                <textarea id="beta-input-next-action" rows="2"></textarea>
+                <textarea id="beta-input-next-action" rows="3"></textarea>
               </label>
-              <label>
+              <label class="beta-field-follow-up">
                 Process Follow-up
-                <textarea id="beta-input-notes" rows="2" placeholder="Follow-up notes, validation progress, reminders..."></textarea>
+                <textarea id="beta-input-notes" rows="3" placeholder="Follow-up notes, validation progress, reminders..."></textarea>
               </label>
             </div>
             <div class="quick-input-actions">
