@@ -2091,10 +2091,7 @@ body {
   }
 
   .filter-bar,
-  .summary-strip,
     .status-board,
-    .firmware-summary,
-    .beta-summary,
     .beta-input-grid,
     .beta-draft-grid,
     .beta-card,
@@ -2102,6 +2099,75 @@ body {
     .firmware-card,
     .date-range-filter {
     grid-template-columns: 1fr;
+  }
+
+  .summary-strip {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .summary-strip button {
+    min-height: 104px;
+    border-radius: 20px;
+    padding: 16px 18px 15px;
+  }
+
+  .summary-strip button::before {
+    border-radius: 20px 20px 0 0;
+  }
+
+  .summary-strip span {
+    font-size: 13px;
+    margin-bottom: 10px;
+    padding-right: 44px;
+  }
+
+  .summary-strip strong {
+    font-size: clamp(42px, 12vw, 64px);
+  }
+
+  .summary-percent {
+    inset: 42px 17px auto auto;
+    font-size: 16px;
+  }
+
+  .firmware-summary {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .firmware-summary div {
+    min-height: 92px;
+    border-radius: 18px;
+    padding: 16px 18px;
+  }
+
+  .firmware-summary strong {
+    font-size: clamp(2rem, 11vw, 3.2rem);
+  }
+
+  .beta-summary {
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .beta-summary div {
+    min-height: 92px;
+    border-width: 1.5px;
+    border-radius: 18px;
+    padding: 16px 18px;
+  }
+
+  .beta-summary span {
+    font-size: 0.68rem;
+  }
+
+  .beta-summary strong {
+    margin-top: 8px;
+    font-size: clamp(2rem, 11vw, 3.4rem);
   }
 
   .beta-field-test-item,
