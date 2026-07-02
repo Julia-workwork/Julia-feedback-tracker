@@ -1207,8 +1207,8 @@ body {
   border-radius: 18px;
   background: #101217;
   color: #ffffff;
-  min-height: 132px;
-  padding: 20px 22px;
+  min-height: 112px;
+  padding: 18px 20px;
 }
 
 .firmware-summary span {
@@ -1220,9 +1220,9 @@ body {
 
 .firmware-summary strong {
   display: block;
-  margin-top: 8px;
+  margin-top: 6px;
   font-family: var(--summary-number-font);
-  font-size: clamp(2.3rem, 4vw, 4.1rem);
+  font-size: clamp(2.2rem, 3.4vw, 3.8rem);
   line-height: 0.95;
 }
 
@@ -1871,12 +1871,12 @@ body {
 
 .beta-summary div {
   --beta-accent: #0874f2;
-  min-height: 118px;
+  min-height: 108px;
   border: 2px solid var(--beta-accent);
   border-radius: 22px;
   background: #ffffff;
   box-shadow: 0 18px 44px rgb(22 31 45 / 8%);
-  padding: 20px;
+  padding: 18px 20px;
 }
 
 .beta-summary .beta-total {
@@ -1914,9 +1914,9 @@ body {
 
 .beta-summary strong {
   display: block;
-  margin-top: 12px;
+  margin-top: 8px;
   font-family: var(--summary-number-font);
-  font-size: clamp(2.4rem, 4vw, 4.7rem);
+  font-size: clamp(2.3rem, 3.6vw, 4.2rem);
   line-height: 0.85;
 }
 
@@ -2120,11 +2120,64 @@ body {
     grid-column: 1 / -1;
   }
 
-  .summary-strip,
-  .status-board,
+  .status-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-strip {
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .summary-strip button {
+    min-height: 112px;
+    border-radius: 22px;
+    padding: 18px 20px 16px;
+  }
+
+  .summary-strip button::before {
+    border-radius: 22px 22px 0 0;
+  }
+
+  .summary-strip span {
+    font-size: 13px;
+    margin-bottom: 10px;
+    padding-right: 46px;
+  }
+
+  .summary-strip strong {
+    font-size: clamp(48px, 7vw, 72px);
+  }
+
+  .summary-percent {
+    inset: 42px 18px auto auto;
+    font-size: 17px;
+  }
+
   .firmware-summary,
   .beta-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .firmware-summary div,
+  .beta-summary div {
+    min-height: 86px;
+    border-radius: 16px;
+    padding: 14px 16px;
+  }
+
+  .firmware-summary span,
+  .beta-summary span {
+    font-size: 0.72rem;
+  }
+
+  .firmware-summary strong,
+  .beta-summary strong {
+    margin-top: 5px;
+    font-size: clamp(2rem, 5vw, 3rem);
   }
 
   .beta-input-grid,
@@ -2250,13 +2303,14 @@ body {
   }
 
   .firmware-summary div {
-    min-height: 92px;
+    min-height: 78px;
     border-radius: 18px;
-    padding: 16px 18px;
+    padding: 13px 16px;
   }
 
   .firmware-summary strong {
-    font-size: clamp(2rem, 11vw, 3.2rem);
+    margin-top: 4px;
+    font-size: clamp(1.8rem, 9vw, 2.8rem);
   }
 
   .beta-summary {
@@ -2266,10 +2320,10 @@ body {
   }
 
   .beta-summary div {
-    min-height: 92px;
+    min-height: 78px;
     border-width: 1.5px;
     border-radius: 18px;
-    padding: 16px 18px;
+    padding: 13px 16px;
   }
 
   .beta-summary span {
@@ -2277,8 +2331,8 @@ body {
   }
 
   .beta-summary strong {
-    margin-top: 8px;
-    font-size: clamp(2rem, 11vw, 3.4rem);
+    margin-top: 4px;
+    font-size: clamp(1.8rem, 9vw, 2.9rem);
   }
 
   .beta-field-test-item,
