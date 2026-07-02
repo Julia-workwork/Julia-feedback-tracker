@@ -1705,6 +1705,11 @@ function applySavedChanges(record, changes, result = {}) {
     record.dashboardStatus = changes["Dashboard Status"];
     record.status = Object.entries(STATUS_LABELS).find(([, label]) => label === changes["Dashboard Status"])?.[0] || record.status;
   }
+  if (changes["Update Category"] !== undefined) {
+    record.updateCategory = changes["Update Category"];
+    record.categories = splitFeedbackCategories(changes["Update Category"]);
+    record.primaryCategory = record.categories[0] || "";
+  }
   if (changes.Priority !== undefined) record.priority = changes.Priority;
   if (changes.Notes !== undefined) record.notes = changes.Notes;
   if (changes["Request number"] !== undefined) record.requestNumber = changes["Request number"];
@@ -1760,6 +1765,54 @@ function doneSelectTemplate(record) {
   `;
 }
 
+function categoryEditorTemplate(value, modifier = "") {
+  const selected = new Set(splitFeedbackCategories(value));
+  const modifierClass = modifier ? ` ${modifier}` : "";
+  return `
+    <div class="detail-category-editor${modifierClass}">
+      <input type="hidden" name="Update Category" value="${escapeHtml(splitFeedbackCategories(value).join(", "))}" />
+      <div class="feedback-category-options" aria-label="Update Category options">
+        ${FEEDBACK_CATEGORY_OPTIONS.map(
+          (category) => `
+            <button
+              class="category-choice ${categoryClass(category)}${selected.has(category) ? " is-selected" : ""}"
+              type="button"
+              data-detail-category="${escapeHtml(category)}"
+              aria-pressed="${selected.has(category) ? "true" : "false"}"
+            >${escapeHtml(category)}</button>
+          `,
+        ).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function bindDetailCategoryEditor() {
+  const editor = elements.detail.querySelector(".detail-category-editor");
+  if (!editor) return;
+  const input = editor.querySelector('input[name="Update Category"]');
+  const buttons = editor.querySelectorAll("[data-detail-category]");
+  editor.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-detail-category]");
+    if (!button || !input) return;
+    const selected = new Set(splitFeedbackCategories(input.value));
+    const category = button.dataset.detailCategory;
+    if (selected.has(category)) {
+      selected.delete(category);
+    } else {
+      selected.add(category);
+    }
+    const ordered = FEEDBACK_CATEGORY_OPTIONS.filter((option) => selected.has(option));
+    const extras = [...selected].filter((option) => !FEEDBACK_CATEGORY_OPTIONS.includes(option));
+    input.value = [...ordered, ...extras].join(", ");
+    buttons.forEach((choice) => {
+      const isSelected = splitFeedbackCategories(input.value).includes(choice.dataset.detailCategory);
+      choice.classList.toggle("is-selected", isSelected);
+      choice.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    });
+  });
+}
+
 function fieldValuesFromDetail() {
   const fields = elements.detail.querySelectorAll("[name]");
   return [...fields].reduce((values, field) => {
@@ -1771,6 +1824,7 @@ function fieldValuesFromDetail() {
 function originalEditableValues(record) {
   return {
     "Dashboard Status": STATUS_LABELS[record.status] || "",
+    "Update Category": record.updateCategory,
     Priority: record.priority,
     Notes: record.notes,
     "Request number": record.requestNumber,
@@ -1990,6 +2044,7 @@ function openDetail(record, options = { source: "feedback" }) {
       ${linkedFirmwareTemplate(record)}
       ${detailRow("Original Feedback", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
+      ${permissionAwareDetailRow("Update Category", record.updateCategory, categoryEditorTemplate(record.updateCategory), "wide")}
       ${permissionAwareDetailRow("Status", STATUS_LABELS[record.status] || "-", statusSelectTemplate(record), "short")}
       ${permissionAwareDetailRow("Priority", record.priority, prioritySelectTemplate(record), "short")}
       ${permissionAwareDetailRow("Request number", record.requestNumber, `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
@@ -2006,6 +2061,7 @@ function openDetail(record, options = { source: "feedback" }) {
     </dl>
     ${canEdit("feedback") ? `<button class="save-detail-changes" type="button">Save Changes</button>` : ""}
   `;
+  bindDetailCategoryEditor();
   document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
     await copyEngineerSummary(record);
     showToast("Engineer summary copied");
