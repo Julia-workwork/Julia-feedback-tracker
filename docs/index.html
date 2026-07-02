@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Engineering Follow-up Dashboard</title>
-    <link rel="stylesheet" href="./styles.css?v=20260702-beta-input-layout" />
+    <link rel="stylesheet" href="./styles.css?v=20260702-feedback-category-multiselect" />
   </head>
   <body>
     <section id="login-screen" class="login-screen">
@@ -126,10 +126,19 @@
                 Email
                 <input id="feedback-input-email" type="email" placeholder="user@example.com" />
               </label>
-              <label>
-                Update Category
-                <input id="feedback-input-category" placeholder="BUG, Feature Request..." />
-              </label>
+              <fieldset class="feedback-category-field">
+                <legend>Update Category</legend>
+                <input id="feedback-input-category" type="hidden" />
+                <div id="feedback-input-category-options" class="feedback-category-options" aria-label="Update Category options">
+                  <button class="category-choice category-bug" type="button" data-category="BUG" aria-pressed="false">BUG</button>
+                  <button class="category-choice category-feature-request" type="button" data-category="Feature Request" aria-pressed="false">Feature Request</button>
+                  <button class="category-choice category-feature-enhancement" type="button" data-category="Feature Enhancement" aria-pressed="false">Feature Enhancement</button>
+                  <button class="category-choice category-cps" type="button" data-category="CPS" aria-pressed="false">CPS</button>
+                  <button class="category-choice category-app" type="button" data-category="APP" aria-pressed="false">APP</button>
+                  <button class="category-choice category-positive-review" type="button" data-category="Positive review" aria-pressed="false">Positive review</button>
+                  <button class="category-choice category-negative-review" type="button" data-category="Negative review" aria-pressed="false">Negative review</button>
+                </div>
+              </fieldset>
               <label>
                 Priority
                 <select id="feedback-input-priority">
@@ -430,6 +439,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260628-feedback-card-toggle"></script>
+    <script type="module" src="./app.js?v=20260702-feedback-category-multiselect"></script>
   </body>
 </html>

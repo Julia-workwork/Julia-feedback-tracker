@@ -68,6 +68,15 @@ const BETA_ISSUE_SOURCE_OPTIONS = ["User Report", "Internal Found", "Regression"
 const BETA_STATUS_OPTIONS = ["Open", "Need Review", "Reproducing", "In Progress", "Resolved", "Closed"];
 const BETA_SEVERITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
 const BETA_PRIORITY_OPTIONS = ["P0", "P1", "P2"];
+const FEEDBACK_CATEGORY_OPTIONS = [
+  "BUG",
+  "Feature Request",
+  "Feature Enhancement",
+  "CPS",
+  "APP",
+  "Positive review",
+  "Negative review",
+];
 const HERO_COPY = {
   feedback: {
     eyebrow: "Julia's Feedback Tracker",
@@ -157,6 +166,7 @@ const elements = {
   feedbackInputId: document.querySelector("#feedback-input-id"),
   feedbackInputEmail: document.querySelector("#feedback-input-email"),
   feedbackInputCategory: document.querySelector("#feedback-input-category"),
+  feedbackInputCategoryOptions: document.querySelector("#feedback-input-category-options"),
   feedbackInputPriority: document.querySelector("#feedback-input-priority"),
   feedbackInputRequest: document.querySelector("#feedback-input-request"),
   feedbackInputChannel: document.querySelector("#feedback-input-channel"),
@@ -1225,6 +1235,49 @@ function syncChangesToGoogleSheet(record, changes) {
     });
 }
 
+function splitFeedbackCategories(value) {
+  const seen = new Set();
+  const categories = String(value || "")
+    .split(/[,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => FEEDBACK_CATEGORY_OPTIONS.find((option) => option.toLowerCase() === item.toLowerCase()) || item)
+    .filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+  return categories;
+}
+
+function syncFeedbackCategoryChoices() {
+  const categories = splitFeedbackCategories(elements.feedbackInputCategory.value);
+  const selected = new Set(categories);
+  elements.feedbackInputCategoryOptions?.querySelectorAll("[data-category]").forEach((button) => {
+    const isSelected = selected.has(button.dataset.category);
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  });
+}
+
+function setFeedbackCategories(value) {
+  elements.feedbackInputCategory.value = splitFeedbackCategories(value).join(", ");
+  syncFeedbackCategoryChoices();
+}
+
+function toggleFeedbackCategory(category) {
+  const selected = new Set(splitFeedbackCategories(elements.feedbackInputCategory.value));
+  if (selected.has(category)) {
+    selected.delete(category);
+  } else {
+    selected.add(category);
+  }
+  const ordered = FEEDBACK_CATEGORY_OPTIONS.filter((option) => selected.has(option));
+  const extras = [...selected].filter((option) => !FEEDBACK_CATEGORY_OPTIONS.includes(option));
+  elements.feedbackInputCategory.value = [...ordered, ...extras].join(", ");
+  syncFeedbackCategoryChoices();
+}
+
 function feedbackPayloadFromInput() {
   return {
     Date: elements.feedbackInputDate.value.trim(),
@@ -1411,7 +1464,7 @@ function analyzeFeedbackInput() {
   if (draft.model && !elements.feedbackInputModel.value.trim()) elements.feedbackInputModel.value = draft.model;
   if (draft.userId && !elements.feedbackInputId.value.trim()) elements.feedbackInputId.value = draft.userId;
   if (draft.email && !elements.feedbackInputEmail.value.trim()) elements.feedbackInputEmail.value = draft.email;
-  if (draft.category && !elements.feedbackInputCategory.value.trim()) elements.feedbackInputCategory.value = draft.category;
+  if (draft.category && !elements.feedbackInputCategory.value.trim()) setFeedbackCategories(draft.category);
   if (draft.priority) elements.feedbackInputPriority.value = draft.priority;
   if (draft.requestNumber && !elements.feedbackInputRequest.value.trim()) elements.feedbackInputRequest.value = draft.requestNumber;
   if (draft.channel && !elements.feedbackInputChannel.value.trim()) elements.feedbackInputChannel.value = draft.channel;
@@ -1438,6 +1491,7 @@ function clearFeedbackInput() {
     return;
   }
   elements.feedbackInputForm.reset();
+  setFeedbackCategories("");
   elements.feedbackInputPriority.value = "P2";
   elements.feedbackInputStatus.value = "To Submit";
   setFeedbackInputMessage("");
@@ -1453,6 +1507,7 @@ function toggleFeedbackInput(open) {
   if (open && !elements.feedbackInputDate.value) {
     elements.feedbackInputDate.value = new Date().toISOString().slice(0, 10);
   }
+  syncFeedbackCategoryChoices();
 }
 
 async function saveFeedbackInput() {
@@ -2324,6 +2379,11 @@ elements.feedbackAdd.addEventListener("click", () => {
   toggleFeedbackInput(isClosed);
 });
 elements.feedbackClose.addEventListener("click", () => toggleFeedbackInput(false));
+elements.feedbackInputCategoryOptions?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-category]");
+  if (!button) return;
+  toggleFeedbackCategory(button.dataset.category);
+});
 elements.feedbackAnalyze.addEventListener("click", analyzeFeedbackInput);
 elements.feedbackClear.addEventListener("click", clearFeedbackInput);
 elements.feedbackInputForm.addEventListener("submit", async (event) => {
