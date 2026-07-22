@@ -464,6 +464,10 @@ body {
   --summary-accent: #35c7b4;
 }
 
+.summary-strip .summary-not-accepted {
+  --summary-accent: #6b7280;
+}
+
 .summary-strip .summary-bug {
   --summary-accent: #f5364e;
 }
@@ -482,6 +486,10 @@ body {
 
 .status-column[data-status="resolved"]::before {
   background: #35c7b4;
+}
+
+.status-column[data-status="notAccepted"]::before {
+  background: #6b7280;
 }
 
 .summary-strip span {
@@ -521,7 +529,7 @@ body {
 
 .status-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
   align-items: start;
 }

@@ -571,6 +571,7 @@ function renderSummary(records) {
     ["submitted", "Submitted", summary.statusCounts.submitted, "summary-submitted", percentages.submitted],
     ["inProgress", "In Progress", summary.statusCounts.inProgress, "summary-progress", percentages.inProgress],
     ["resolved", "Resolved", summary.statusCounts.resolved, "summary-resolved", percentages.resolved],
+    ["notAccepted", "Not Accepted", summary.statusCounts.notAccepted, "summary-not-accepted", percentages.notAccepted],
     ["unresolvedBug", "Unresolved BUG", summary.unresolvedBugs, "summary-bug", percentages.unresolvedBug],
   ];
   elements.summary.innerHTML = items
@@ -634,6 +635,9 @@ function applySummaryFilter(records) {
   }
   if (state.summaryFilter === "resolved") {
     return records.filter((record) => record.status === "resolved");
+  }
+  if (state.summaryFilter === "notAccepted") {
+    return records.filter((record) => record.status === "notAccepted");
   }
   if (state.summaryFilter === "unresolvedBug") {
     return records.filter((record) => record.status !== "resolved" && record.categories.includes("BUG"));
@@ -1049,7 +1053,7 @@ function renderBeta() {
 }
 
 function renderBoard(records) {
-  const columns = ["todo", "submitted", "inProgress", "resolved"];
+  const columns = ["todo", "submitted", "inProgress", "resolved", "notAccepted"];
   elements.board.innerHTML = columns
     .map((status) => {
       const items = records.filter((record) => record.status === status);
