@@ -13,6 +13,7 @@ export const STATUS_LABELS = {
   submitted: "Submitted",
   inProgress: "In Progress",
   resolved: "Resolved",
+  notAccepted: "Not Accepted",
 };
 
 export const STATUS_BY_LABEL = {
@@ -20,6 +21,7 @@ export const STATUS_BY_LABEL = {
   Submitted: "submitted",
   "In Progress": "inProgress",
   Resolved: "resolved",
+  "Not Accepted": "notAccepted",
 };
 
 export const DASHBOARD_MODULES = ["feedback", "firmware", "beta"];
@@ -526,6 +528,7 @@ export function summarizeFeedback(records) {
     submitted: 0,
     inProgress: 0,
     resolved: 0,
+    notAccepted: 0,
   };
   const categoryCounts = {
     BUG: 0,
@@ -538,7 +541,9 @@ export function summarizeFeedback(records) {
   };
 
   for (const record of records) {
-    statusCounts[record.status] += 1;
+    if (statusCounts[record.status] !== undefined) {
+      statusCounts[record.status] += 1;
+    }
     for (const category of record.categories) {
       categoryCounts[category] += 1;
     }
@@ -565,6 +570,7 @@ export function summaryPercentages(summary) {
     submitted: formatPercent(submitted, total),
     inProgress: formatPercent(summary.statusCounts?.inProgress || 0, total),
     resolved: formatPercent(summary.statusCounts?.resolved || 0, total),
+    notAccepted: formatPercent(summary.statusCounts?.notAccepted || 0, total),
     unresolvedBug: formatPercent(summary.unresolvedBugs || 0, submitted),
   };
 }
