@@ -66,6 +66,13 @@ const BETA_TEST_TYPE_OPTIONS = ["Firmware", "APP", "CPS", "Hardware", "Accessory
 const BETA_TESTER_TYPE_OPTIONS = ["Internal Test", "User Beta Test", "Engineer Test", "KOC Test"];
 const BETA_ISSUE_SOURCE_OPTIONS = ["User Report", "Internal Found", "Regression", "Known Issue"];
 const BETA_STATUS_OPTIONS = ["Open", "Need Review", "Reproducing", "In Progress", "Resolved", "Closed"];
+const FEEDBACK_STATUS_OPTIONS = [
+  ["todo", "To Submit"],
+  ["submitted", "Submitted"],
+  ["inProgress", "In Progress"],
+  ["resolved", "Resolved"],
+  ["notAccepted", "Not Accepted"],
+];
 const BETA_SEVERITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
 const BETA_PRIORITY_OPTIONS = ["P0", "P1", "P2"];
 const FEEDBACK_CATEGORY_OPTIONS = [
@@ -1739,7 +1746,7 @@ function permissionAwareDetailRow(label, value, fieldHtml, size = "medium") {
 function statusSelectTemplate(record) {
   return `
     <select name="Dashboard Status">
-      ${Object.entries(STATUS_LABELS)
+      ${FEEDBACK_STATUS_OPTIONS
         .map(
           ([status, label]) =>
             `<option value="${escapeHtml(label)}"${record.status === status ? " selected" : ""}>${escapeHtml(label)}</option>`,
