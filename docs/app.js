@@ -572,13 +572,14 @@ function updateBetaFilterSummary() {
 function renderSummary(records) {
   const summary = summarizeFeedback(records);
   const percentages = summaryPercentages(summary);
+  const statusCounts = summary.statusCounts || {};
   const items = [
     ["total", "Total", summary.total, "summary-total", ""],
-    ["todo", "To Submit", summary.statusCounts.todo, "summary-todo", percentages.todo],
-    ["submitted", "Submitted", summary.statusCounts.submitted, "summary-submitted", percentages.submitted],
-    ["inProgress", "In Progress", summary.statusCounts.inProgress, "summary-progress", percentages.inProgress],
-    ["resolved", "Resolved", summary.statusCounts.resolved, "summary-resolved", percentages.resolved],
-    ["notAccepted", "Not Accepted", summary.statusCounts.notAccepted, "summary-not-accepted", percentages.notAccepted],
+    ["todo", "To Submit", statusCounts.todo || 0, "summary-todo", percentages.todo],
+    ["submitted", "Submitted", statusCounts.submitted || 0, "summary-submitted", percentages.submitted],
+    ["inProgress", "In Progress", statusCounts.inProgress || 0, "summary-progress", percentages.inProgress],
+    ["resolved", "Resolved", statusCounts.resolved || 0, "summary-resolved", percentages.resolved],
+    ["notAccepted", "Not Accepted", statusCounts.notAccepted || 0, "summary-not-accepted", percentages.notAccepted],
     ["unresolvedBug", "Unresolved BUG", summary.unresolvedBugs, "summary-bug", percentages.unresolvedBug],
   ];
   elements.summary.innerHTML = items
