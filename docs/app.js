@@ -579,8 +579,8 @@ function renderSummary(records) {
     ["submitted", "Submitted", statusCounts.submitted || 0, "summary-submitted", percentages.submitted],
     ["inProgress", "In Progress", statusCounts.inProgress || 0, "summary-progress", percentages.inProgress],
     ["resolved", "Resolved", statusCounts.resolved || 0, "summary-resolved", percentages.resolved],
-    ["notAccepted", "Not Accepted", statusCounts.notAccepted || 0, "summary-not-accepted", percentages.notAccepted],
     ["unresolvedBug", "Unresolved BUG", summary.unresolvedBugs, "summary-bug", percentages.unresolvedBug],
+    ["notAccepted", "Not Accepted", statusCounts.notAccepted || 0, "summary-not-accepted", percentages.notAccepted],
   ];
   elements.summary.innerHTML = items
     .map(
