@@ -883,19 +883,27 @@ body {
 }
 
 .beta-edit-log ul {
-  display: grid;
-  gap: 6px;
+  display: block;
+  max-height: 88px;
   margin: 0;
   padding: 0;
   list-style: none;
+  overflow-y: auto;
+  line-height: 1.55;
 }
 
 .beta-edit-log li {
-  padding: 8px 10px;
-  border-left: 3px solid #0874f2;
-  border-radius: 0 6px 6px 0;
-  background: #f4f8ff;
-  line-height: 1.4;
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: inherit;
+}
+
+.beta-edit-log li:not(:last-child)::after {
+  content: "  |  ";
+  color: #0874f2;
+  font-weight: 700;
 }
 
 .empty-column {
