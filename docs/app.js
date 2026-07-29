@@ -889,6 +889,66 @@ function betaEditableRow(record, header, value, fieldHtml, size = "medium") {
   return canEdit("beta") ? editableDetailRow(betaDetailLabel(header), fieldHtml, size) : detailRow(betaDetailLabel(header), value);
 }
 
+const BETA_EDIT_LOG_FIELDS = [
+  "Version",
+  "Test Item",
+  "Test Type",
+  "Tester Type",
+  "Issue Source",
+  "Issue Found",
+  "Key Point",
+  "Severity",
+  "Priority",
+  "Status",
+  "Assigned To",
+  "Engineering Response",
+  "Next Action",
+  "Target Date",
+  "Resolved Date",
+  "Related Request Number",
+  "Related Firmware Version",
+  "Process Follow-up",
+];
+
+function betaEditLogEntries(value) {
+  const text = cleanText(value);
+  if (!text) return [];
+
+  return text
+    .split(/\n(?=\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}:\d{2})?\s*·)/)
+    .map((entry) => {
+      const match = entry.match(
+        /^(\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}:\d{2})?)\s*·\s*([^:]+):\s*([\s\S]*)$/,
+      );
+      if (!match) return "Earlier edit · Updated: Record";
+
+      const [, timestamp, actor, detail] = match;
+      const concise = detail.match(/^Updated:\s*([^\n]+)$/i);
+      if (concise) {
+        return `${timestamp} · ${actor.trim()} · Updated: ${concise[1].trim()}`;
+      }
+
+      const normalizedDetail = detail.toLowerCase();
+      const fields = BETA_EDIT_LOG_FIELDS.filter((field) =>
+        normalizedDetail.includes(`updated ${field.toLowerCase()}`),
+      );
+      return `${timestamp} · ${actor.trim()} · Updated: ${fields.join(", ") || "Record"}`;
+    })
+    .filter(Boolean);
+}
+
+function betaEditLogTemplate(value) {
+  const entries = betaEditLogEntries(value);
+  return `<div class="beta-edit-log">
+    <dt>Edit Log</dt>
+    <dd>${
+      entries.length
+        ? `<ul>${entries.map((entry) => `<li>${escapeHtml(entry)}</li>`).join("")}</ul>`
+        : "-"
+    }</dd>
+  </div>`;
+}
+
 function betaFullDetail(record) {
   const rows = [
     `Date: ${record.date || "-"}`,
@@ -911,7 +971,7 @@ function betaFullDetail(record) {
     `Related Request Number: ${record.relatedRequestNumber || "-"}`,
     `Related Firmware Version: ${record.relatedFirmwareVersion || "-"}`,
     `Process Follow-up: ${record.notes || "-"}`,
-    `Edit Log: ${record.editLog || "-"}`,
+    `Edit Log: ${betaEditLogEntries(record.editLog).join("\n") || "-"}`,
   ];
   if (!hideIdentityInOperationalView()) {
     rows.splice(6, 0, `Tester / Owner: ${record.testerOwner || "-"}`);
@@ -998,7 +1058,7 @@ function openBetaDetail(record) {
       ${betaEditableRow(record, "Related Request Number", record.relatedRequestNumber, inputTemplate("Related Request Number", record.relatedRequestNumber))}
       ${betaEditableRow(record, "Related Firmware Version", record.relatedFirmwareVersion, inputTemplate("Related Firmware Version", record.relatedFirmwareVersion))}
       ${betaEditableRow(record, "Notes", record.notes, textareaTemplate("Notes", record.notes, 5), "wide")}
-      ${detailRow("Edit Log", record.editLog)}
+      ${betaEditLogTemplate(record.editLog)}
     </dl>
     ${canEdit("beta") ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
   `;

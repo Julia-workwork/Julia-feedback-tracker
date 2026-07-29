@@ -882,6 +882,22 @@ body {
   overflow-wrap: anywhere;
 }
 
+.beta-edit-log ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beta-edit-log li {
+  padding: 8px 10px;
+  border-left: 3px solid #0874f2;
+  border-radius: 0 6px 6px 0;
+  background: #f4f8ff;
+  line-height: 1.4;
+}
+
 .empty-column {
   color: #6a7582;
   font-size: 13px;
