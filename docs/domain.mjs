@@ -201,7 +201,7 @@ export function normalizeFirmwareRow(row) {
 }
 
 export function normalizeBetaRow(row) {
-  const originalFeedback = clean(row["Original Feedback"] || row["Raw Input"]);
+  const originalFeedback = clean(row["Original Feedback"] || row["Raw Input"] || row["Input Area"]);
   const testResults = clean(row["Test Results"] || row["Issue Found"]);
   const featureRequests = clean(row["Feature Requests"]);
   const communicationFollowUp = clean(
@@ -248,7 +248,7 @@ export function betaDetailHeading(record) {
 }
 
 export function betaDetailLabel(header) {
-  if (header === "Raw Input" || header === "Original Feedback") return "Original Feedback";
+  if (header === "Raw Input" || header === "Input Area" || header === "Original Feedback") return "Original Feedback";
   if (header === "Issue Found" || header === "Test Results") return "Test Results";
   if (["Notes", "Process Follow-up", "Communication Follow-up"].includes(header)) {
     return "Communication Follow-up";

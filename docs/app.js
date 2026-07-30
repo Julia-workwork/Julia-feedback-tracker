@@ -57,7 +57,7 @@ const SHEET_HEADERS_BY_POSITION = [
 const FIRMWARE_REQUIRED_HEADERS = ["Date", "Model", "Firmware Version", "Change log", "更新日志", "关闭需求"];
 const BETA_REQUIRED_HEADERS = ["Date", "Product Model", "Version", "Status"];
 const BETA_CONTENT_HEADER_GROUPS = [
-  ["Original Feedback", "Raw Input"],
+  ["Original Feedback", "Raw Input", "Input Area"],
   ["Test Results", "Issue Found"],
 ];
 const EXPECTED_SHEET_HEADERS = new Set([
