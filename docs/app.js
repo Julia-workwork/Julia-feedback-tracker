@@ -27,7 +27,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260730-beta-original-feedback";
+} from "./lib/domain.mjs?v=20260730-login-module-sync";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
