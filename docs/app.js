@@ -2,7 +2,6 @@ import {
   BETA_TEST_HEADERS,
   betaDetailHeading,
   betaDetailLabel,
-  buildBetaCreateRow,
   STATUS_LABELS,
   buildFirmwareLookup,
   categoryClass,
@@ -27,7 +26,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260730-login-module-sync";
+} from "./lib/domain.mjs?v=20260730-login-import-guard";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -80,6 +79,43 @@ const FEEDBACK_STATUS_OPTIONS = [
 ];
 const BETA_SEVERITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
 const BETA_PRIORITY_OPTIONS = ["P0", "P1", "P2"];
+
+function cleanBetaField(value) {
+  return String(value ?? "").trim();
+}
+
+function buildBetaCreateRow(fields = {}) {
+  const explicitOriginalFeedback = cleanBetaField(fields.originalFeedback);
+  const originalFeedback = explicitOriginalFeedback || cleanBetaField(fields.rawInput);
+
+  return {
+    Date: cleanBetaField(fields.date),
+    "Product Model": cleanBetaField(fields.productModel ?? fields.model),
+    Version: cleanBetaField(fields.version),
+    "Test Item": cleanBetaField(fields.testItem),
+    "Test Type": cleanBetaField(fields.testType),
+    "Tester Type": cleanBetaField(fields.testerType),
+    "Tester / Owner": cleanBetaField(fields.testerOwner),
+    "Issue Source": cleanBetaField(fields.issueSource) || "User Report",
+    "Key Point": cleanBetaField(fields.keyPoint),
+    "Original Feedback": originalFeedback,
+    "Test Results": cleanBetaField(fields.testResults),
+    "Feature Requests": cleanBetaField(fields.featureRequests),
+    "Communication Follow-up": cleanBetaField(fields.communicationFollowUp),
+    Severity: cleanBetaField(fields.severity),
+    Priority: cleanBetaField(fields.priority),
+    Status: cleanBetaField(fields.status),
+    "Assigned To": cleanBetaField(fields.assignedTo),
+    "Engineering Response": cleanBetaField(fields.engineeringResponse),
+    "Next Action": cleanBetaField(fields.nextAction),
+    "Target Date": cleanBetaField(fields.targetDate),
+    "Resolved Date": cleanBetaField(fields.resolvedDate),
+    "Related Request Number": cleanBetaField(fields.relatedRequestNumber),
+    "Related Firmware Version": cleanBetaField(fields.relatedFirmwareVersion ?? fields.version),
+    "Edit Log": cleanBetaField(fields.editLog),
+  };
+}
+
 const FEEDBACK_CATEGORY_OPTIONS = [
   "BUG",
   "Feature Request",
