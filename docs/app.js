@@ -2,6 +2,7 @@ import {
   BETA_TEST_HEADERS,
   betaDetailHeading,
   betaDetailLabel,
+  buildBetaCreateRow,
   STATUS_LABELS,
   buildFirmwareLookup,
   categoryClass,
@@ -26,7 +27,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260625-beta-keypoint-manual";
+} from "./lib/domain.mjs?v=20260730-beta-original-feedback";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -1638,31 +1639,29 @@ async function saveFeedbackInput() {
 }
 
 function betaPayloadFromInput() {
-  return {
-    Date: elements.betaInputDate.value.trim(),
-    "Product Model": elements.betaInputModel.value.trim(),
-    Version: elements.betaInputVersion.value.trim(),
-    "Test Type": elements.betaInputTestType.value.trim(),
-    "Test Item": elements.betaInputTestItem.value.trim(),
-    "Tester Type": elements.betaInputTesterType.value.trim(),
-    "Tester / Owner": elements.betaInputTesterOwner.value.trim(),
-    "Issue Source": "User Report",
-    "Key Point": elements.betaInputKeyPoint.value.trim(),
-    "Original Feedback": elements.betaRawInput.value.trim(),
-    "Test Results": elements.betaInputIssueFound.value.trim(),
-    "Feature Requests": elements.betaInputFeatureRequests.value.trim(),
-    "Communication Follow-up": elements.betaInputNotes.value.trim(),
-    Severity: elements.betaInputSeverity.value.trim(),
-    Priority: elements.betaInputPriority.value.trim(),
-    Status: elements.betaInputStatus.value.trim(),
-    "Assigned To": "",
-    "Engineering Response": "",
-    "Next Action": elements.betaInputNextAction.value.trim(),
-    "Target Date": "",
-    "Resolved Date": "",
-    "Related Request Number": "",
-    "Related Firmware Version": elements.betaInputVersion.value.trim(),
-  };
+  const originalFeedback = elements.betaRawInput.value.trim();
+
+  return buildBetaCreateRow({
+    date: elements.betaInputDate.value.trim(),
+    productModel: elements.betaInputModel.value.trim(),
+    version: elements.betaInputVersion.value.trim(),
+    testItem: elements.betaInputTestItem.value.trim(),
+    testType: elements.betaInputTestType.value.trim(),
+    testerType: elements.betaInputTesterType.value.trim(),
+    testerOwner: elements.betaInputTesterOwner.value.trim(),
+    issueSource: "User Report",
+    keyPoint: elements.betaInputKeyPoint.value.trim(),
+    originalFeedback,
+    rawInput: originalFeedback,
+    testResults: elements.betaInputIssueFound.value.trim(),
+    featureRequests: elements.betaInputFeatureRequests.value.trim(),
+    communicationFollowUp: elements.betaInputNotes.value.trim(),
+    severity: elements.betaInputSeverity.value.trim(),
+    priority: elements.betaInputPriority.value.trim(),
+    status: elements.betaInputStatus.value.trim(),
+    nextAction: elements.betaInputNextAction.value.trim(),
+    relatedFirmwareVersion: elements.betaInputVersion.value.trim(),
+  });
 }
 
 function syncBetaTestRecord(record) {
@@ -1705,12 +1704,11 @@ function analyzeBetaInput() {
   if (!elements.betaInputTesterOwner.value.trim() && draft.testerOwner) {
     elements.betaInputTesterOwner.value = draft.testerOwner;
   }
-  elements.betaInputIssueFound.value = draft.issueFound;
   elements.betaInputSeverity.value = draft.severity;
   elements.betaInputPriority.value = draft.priority;
   elements.betaInputStatus.value = draft.status;
   elements.betaInputNextAction.value = draft.nextAction;
-  setBetaInputMessage("Draft generated. Review it, then save to Sheet.");
+  setBetaInputMessage("Draft generated. Original Feedback stays separate from Test Results.");
 }
 
 function clearBetaInput() {
@@ -1736,8 +1734,8 @@ async function saveBetaInput() {
     setBetaInputMessage("Original Feedback is required.", true);
     return;
   }
-  if (!elements.betaInputIssueFound.value.trim()) {
-    analyzeBetaInput();
+  if (!elements.betaInputDate.value) {
+    elements.betaInputDate.value = new Date().toISOString().slice(0, 10);
   }
   const record = betaPayloadFromInput();
   elements.betaSave.disabled = true;

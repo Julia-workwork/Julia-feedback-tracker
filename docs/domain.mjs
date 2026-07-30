@@ -107,6 +107,38 @@ export function clean(value) {
   return String(value ?? "").trim();
 }
 
+export function buildBetaCreateRow(fields = {}) {
+  const explicitOriginalFeedback = clean(fields.originalFeedback);
+  const originalFeedback = explicitOriginalFeedback || clean(fields.rawInput);
+
+  return {
+    Date: clean(fields.date),
+    "Product Model": clean(fields.productModel ?? fields.model),
+    Version: clean(fields.version),
+    "Test Item": clean(fields.testItem),
+    "Test Type": clean(fields.testType),
+    "Tester Type": clean(fields.testerType),
+    "Tester / Owner": clean(fields.testerOwner),
+    "Issue Source": clean(fields.issueSource) || "User Report",
+    "Key Point": clean(fields.keyPoint),
+    "Original Feedback": originalFeedback,
+    "Test Results": clean(fields.testResults),
+    "Feature Requests": clean(fields.featureRequests),
+    "Communication Follow-up": clean(fields.communicationFollowUp),
+    Severity: clean(fields.severity),
+    Priority: clean(fields.priority),
+    Status: clean(fields.status),
+    "Assigned To": clean(fields.assignedTo),
+    "Engineering Response": clean(fields.engineeringResponse),
+    "Next Action": clean(fields.nextAction),
+    "Target Date": clean(fields.targetDate),
+    "Resolved Date": clean(fields.resolvedDate),
+    "Related Request Number": clean(fields.relatedRequestNumber),
+    "Related Firmware Version": clean(fields.relatedFirmwareVersion ?? fields.version),
+    "Edit Log": clean(fields.editLog),
+  };
+}
+
 export function deriveStatus(row) {
   const dashboardStatus = STATUS_BY_LABEL[clean(row["Dashboard Status"])];
   if (dashboardStatus) return dashboardStatus;
@@ -750,7 +782,6 @@ export function inferBetaDraft(input) {
   const rawInput = clean(input);
   const lower = rawInput.toLowerCase();
   const parsedInput = parseInputLead(rawInput);
-  const issueFound = parsedInput.issueFound;
   let severity = "Medium";
   if (/(crash|reboot|brick|cannot power|dead|freeze|卡死|死机|重启|无法开机|变砖)/i.test(rawInput)) {
     severity = "Critical";
@@ -769,10 +800,10 @@ export function inferBetaDraft(input) {
 
   return {
     originalFeedback: rawInput,
-    testResults: issueFound,
+    testResults: "",
     featureRequests: "",
     communicationFollowUp: "",
-    issueFound,
+    issueFound: "",
     keyPoint: "",
     date: parsedInput.date,
     testerOwner: parsedInput.testerOwner,
