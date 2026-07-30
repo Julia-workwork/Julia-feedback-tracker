@@ -1818,11 +1818,15 @@ body {
 }
 
 .beta-field-issue {
-  grid-column: 1 / span 3;
+  grid-column: 3 / span 2;
 }
 
 .beta-field-key-point {
-  grid-column: 4;
+  grid-column: 1 / span 2;
+}
+
+.beta-field-feature-requests {
+  grid-column: 1 / span 2;
 }
 
 .beta-field-severity {
@@ -1835,7 +1839,7 @@ body {
 }
 
 .beta-field-next-action {
-  grid-column: span 2;
+  grid-column: 3 / span 2;
 }
 
 .beta-field-follow-up {
@@ -1844,6 +1848,7 @@ body {
 
 .beta-field-issue textarea,
 .beta-field-key-point textarea,
+.beta-field-feature-requests textarea,
 .beta-field-next-action textarea,
 .beta-field-follow-up textarea {
   min-height: 78px;
@@ -2244,6 +2249,7 @@ body {
 
   .beta-field-test-item,
   .beta-field-issue,
+  .beta-field-feature-requests,
   .beta-field-next-action,
   .beta-field-follow-up {
     grid-column: 1 / -1;
@@ -2398,6 +2404,7 @@ body {
   .beta-field-owner,
   .beta-field-issue,
   .beta-field-key-point,
+  .beta-field-feature-requests,
   .beta-field-severity,
   .beta-field-priority,
   .beta-field-status,

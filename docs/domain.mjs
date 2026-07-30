@@ -85,8 +85,11 @@ export const BETA_TEST_HEADERS = [
   "Tester Type",
   "Tester / Owner",
   "Issue Source",
-  "Issue Found",
   "Key Point",
+  "Original Feedback",
+  "Test Results",
+  "Feature Requests",
+  "Communication Follow-up",
   "Severity",
   "Priority",
   "Status",
@@ -97,9 +100,7 @@ export const BETA_TEST_HEADERS = [
   "Resolved Date",
   "Related Request Number",
   "Related Firmware Version",
-  "Notes",
   "Edit Log",
-  "Raw Input",
 ];
 
 export function clean(value) {
@@ -200,6 +201,12 @@ export function normalizeFirmwareRow(row) {
 }
 
 export function normalizeBetaRow(row) {
+  const originalFeedback = clean(row["Original Feedback"] || row["Raw Input"]);
+  const testResults = clean(row["Test Results"] || row["Issue Found"]);
+  const featureRequests = clean(row["Feature Requests"]);
+  const communicationFollowUp = clean(
+    row["Communication Follow-up"] || row["Process Follow-up"] || row.Notes,
+  );
   return {
     rowNumber: clean(row.__rowNumber || row.rowNumber),
     date: clean(row.Date),
@@ -210,8 +217,11 @@ export function normalizeBetaRow(row) {
     testerOwner: clean(row["Tester / Owner"]),
     issueSource: clean(row["Issue Source"]),
     testItem: clean(row["Test Item"]),
-    issueFound: clean(row["Issue Found"]),
     keyPoint: clean(row["Key Point"]),
+    originalFeedback,
+    testResults,
+    featureRequests,
+    communicationFollowUp,
     severity: clean(row.Severity),
     priority: clean(row.Priority),
     status: clean(row.Status),
@@ -222,9 +232,11 @@ export function normalizeBetaRow(row) {
     resolvedDate: clean(row["Resolved Date"]),
     relatedRequestNumber: clean(row["Related Request Number"]),
     relatedFirmwareVersion: clean(row["Related Firmware Version"]),
-    notes: clean(row.Notes),
     editLog: clean(row["Edit Log"]),
-    rawInput: clean(row["Raw Input"]),
+    // Legacy aliases keep older UI/API code and existing records readable during migration.
+    rawInput: originalFeedback,
+    issueFound: testResults,
+    notes: communicationFollowUp,
   };
 }
 
@@ -236,7 +248,12 @@ export function betaDetailHeading(record) {
 }
 
 export function betaDetailLabel(header) {
-  return header === "Notes" ? "Process Follow-up" : header;
+  if (header === "Raw Input" || header === "Original Feedback") return "Original Feedback";
+  if (header === "Issue Found" || header === "Test Results") return "Test Results";
+  if (["Notes", "Process Follow-up", "Communication Follow-up"].includes(header)) {
+    return "Communication Follow-up";
+  }
+  return header;
 }
 
 export function isFirmwareReleaseLikeFeedbackRow(row) {
@@ -493,7 +510,11 @@ export function filterBetaTests(records, filters) {
       record.testerOwner,
       record.issueSource,
       record.testItem,
-      record.issueFound,
+      record.keyPoint,
+      record.originalFeedback,
+      record.testResults,
+      record.featureRequests,
+      record.communicationFollowUp,
       record.severity,
       record.priority,
       record.status,
@@ -502,8 +523,6 @@ export function filterBetaTests(records, filters) {
       record.nextAction,
       record.relatedRequestNumber,
       record.relatedFirmwareVersion,
-      record.notes,
-      record.rawInput,
     ]
       .join("\n")
       .toLowerCase();
@@ -749,6 +768,10 @@ export function inferBetaDraft(input) {
       : "Reproduce the issue, confirm affected version, and assign engineering owner.";
 
   return {
+    originalFeedback: rawInput,
+    testResults: issueFound,
+    featureRequests: "",
+    communicationFollowUp: "",
     issueFound,
     keyPoint: "",
     date: parsedInput.date,
@@ -758,6 +781,7 @@ export function inferBetaDraft(input) {
     status,
     nextAction,
     rawInput,
+    notes: "",
   };
 }
 

@@ -55,7 +55,11 @@ const SHEET_HEADERS_BY_POSITION = [
   "Status Change Log",
 ];
 const FIRMWARE_REQUIRED_HEADERS = ["Date", "Model", "Firmware Version", "Change log", "更新日志", "关闭需求"];
-const BETA_REQUIRED_HEADERS = ["Date", "Product Model", "Version", "Issue Found", "Status", "Raw Input"];
+const BETA_REQUIRED_HEADERS = ["Date", "Product Model", "Version", "Status"];
+const BETA_CONTENT_HEADER_GROUPS = [
+  ["Original Feedback", "Raw Input"],
+  ["Test Results", "Issue Found"],
+];
 const EXPECTED_SHEET_HEADERS = new Set([
   ...SHEET_HEADERS_BY_POSITION,
   ...FIRMWARE_REQUIRED_HEADERS,
@@ -214,6 +218,7 @@ const elements = {
   betaInputTesterOwner: document.querySelector("#beta-input-tester-owner"),
   betaInputIssueFound: document.querySelector("#beta-input-issue-found"),
   betaInputKeyPoint: document.querySelector("#beta-input-key-point"),
+  betaInputFeatureRequests: document.querySelector("#beta-input-feature-requests"),
   betaInputSeverity: document.querySelector("#beta-input-severity"),
   betaInputPriority: document.querySelector("#beta-input-priority"),
   betaInputStatus: document.querySelector("#beta-input-status"),
@@ -895,8 +900,11 @@ const BETA_EDIT_LOG_FIELDS = [
   "Test Type",
   "Tester Type",
   "Issue Source",
-  "Issue Found",
   "Key Point",
+  "Original Feedback",
+  "Test Results",
+  "Feature Requests",
+  "Communication Follow-up",
   "Severity",
   "Priority",
   "Status",
@@ -907,7 +915,6 @@ const BETA_EDIT_LOG_FIELDS = [
   "Resolved Date",
   "Related Request Number",
   "Related Firmware Version",
-  "Process Follow-up",
 ];
 
 function betaEditLogEntries(value) {
@@ -959,7 +966,10 @@ function betaFullDetail(record) {
     `Tester Type: ${record.testerType || "-"}`,
     `Issue Source: ${record.issueSource || "-"}`,
     `Key Point: ${record.keyPoint || "-"}`,
-    `Issue Found: ${record.issueFound || "-"}`,
+    `Original Feedback: ${record.originalFeedback || "-"}`,
+    `Test Results: ${record.testResults || "-"}`,
+    `Feature Requests: ${record.featureRequests || "-"}`,
+    `Communication Follow-up: ${record.communicationFollowUp || "-"}`,
     `Severity: ${record.severity || "-"}`,
     `Priority: ${record.priority || "-"}`,
     `Status: ${record.status || "-"}`,
@@ -970,7 +980,6 @@ function betaFullDetail(record) {
     `Resolved Date: ${record.resolvedDate || "-"}`,
     `Related Request Number: ${record.relatedRequestNumber || "-"}`,
     `Related Firmware Version: ${record.relatedFirmwareVersion || "-"}`,
-    `Process Follow-up: ${record.notes || "-"}`,
     `Edit Log: ${betaEditLogEntries(record.editLog).join("\n") || "-"}`,
   ];
   if (!hideIdentityInOperationalView()) {
@@ -1039,8 +1048,11 @@ function openBetaDetail(record) {
         record.issueSource,
         betaSelectTemplate("Issue Source", record.issueSource, selectOptionsFromRecords(state.betaRecords, "issueSource", BETA_ISSUE_SOURCE_OPTIONS)),
       )}
-      ${betaEditableRow(record, "Issue Found", record.issueFound, textareaTemplate("Issue Found", record.issueFound, 4), "wide")}
       ${betaEditableRow(record, "Key Point", record.keyPoint, textareaTemplate("Key Point", record.keyPoint, 3), "wide")}
+      ${betaEditableRow(record, "Original Feedback", record.originalFeedback, textareaTemplate("Original Feedback", record.originalFeedback, 5), "wide")}
+      ${betaEditableRow(record, "Test Results", record.testResults, textareaTemplate("Test Results", record.testResults, 4), "wide")}
+      ${betaEditableRow(record, "Feature Requests", record.featureRequests, textareaTemplate("Feature Requests", record.featureRequests, 4), "wide")}
+      ${betaEditableRow(record, "Communication Follow-up", record.communicationFollowUp, textareaTemplate("Communication Follow-up", record.communicationFollowUp, 5), "wide")}
       ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, BETA_SEVERITY_OPTIONS), "short")}
       ${betaEditableRow(record, "Priority", record.priority, betaSelectTemplate("Priority", record.priority, BETA_PRIORITY_OPTIONS), "short")}
       ${betaEditableRow(
@@ -1057,7 +1069,6 @@ function openBetaDetail(record) {
       ${betaEditableRow(record, "Resolved Date", record.resolvedDate, inputTemplate("Resolved Date", record.resolvedDate, "date"), "short")}
       ${betaEditableRow(record, "Related Request Number", record.relatedRequestNumber, inputTemplate("Related Request Number", record.relatedRequestNumber))}
       ${betaEditableRow(record, "Related Firmware Version", record.relatedFirmwareVersion, inputTemplate("Related Firmware Version", record.relatedFirmwareVersion))}
-      ${betaEditableRow(record, "Notes", record.notes, textareaTemplate("Notes", record.notes, 5), "wide")}
       ${betaEditLogTemplate(record.editLog)}
     </dl>
     ${canEdit("beta") ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
@@ -1240,8 +1251,14 @@ function betaRecordMatchPayload(record) {
     productModel: record.productModel,
     version: record.version,
     testerOwner: record.testerOwner,
-    issueFound: record.issueFound,
-    rawInput: record.rawInput,
+    keyPoint: record.keyPoint,
+    originalFeedback: record.originalFeedback,
+    testResults: record.testResults,
+    featureRequests: record.featureRequests,
+    communicationFollowUp: record.communicationFollowUp,
+    issueFound: record.testResults || record.issueFound,
+    rawInput: record.originalFeedback || record.rawInput,
+    notes: record.communicationFollowUp || record.notes,
   };
 }
 
@@ -1630,8 +1647,11 @@ function betaPayloadFromInput() {
     "Tester Type": elements.betaInputTesterType.value.trim(),
     "Tester / Owner": elements.betaInputTesterOwner.value.trim(),
     "Issue Source": "User Report",
-    "Issue Found": elements.betaInputIssueFound.value.trim(),
     "Key Point": elements.betaInputKeyPoint.value.trim(),
+    "Original Feedback": elements.betaRawInput.value.trim(),
+    "Test Results": elements.betaInputIssueFound.value.trim(),
+    "Feature Requests": elements.betaInputFeatureRequests.value.trim(),
+    "Communication Follow-up": elements.betaInputNotes.value.trim(),
     Severity: elements.betaInputSeverity.value.trim(),
     Priority: elements.betaInputPriority.value.trim(),
     Status: elements.betaInputStatus.value.trim(),
@@ -1642,8 +1662,6 @@ function betaPayloadFromInput() {
     "Resolved Date": "",
     "Related Request Number": "",
     "Related Firmware Version": elements.betaInputVersion.value.trim(),
-    Notes: elements.betaInputNotes.value.trim(),
-    "Raw Input": elements.betaRawInput.value.trim(),
   };
 }
 
@@ -1702,6 +1720,7 @@ function clearBetaInput() {
   }
   elements.betaInputForm.reset();
   elements.betaInputKeyPoint.value = "";
+  elements.betaInputFeatureRequests.value = "";
   elements.betaInputPriority.value = "P2";
   elements.betaInputSeverity.value = "Medium";
   elements.betaInputStatus.value = "Open";
@@ -1714,7 +1733,7 @@ async function saveBetaInput() {
     return;
   }
   if (!elements.betaRawInput.value.trim()) {
-    setBetaInputMessage("Raw Input is required.", true);
+    setBetaInputMessage("Original Feedback is required.", true);
     return;
   }
   if (!elements.betaInputIssueFound.value.trim()) {
@@ -1922,8 +1941,11 @@ const BETA_FIELD_TO_RECORD_KEY = {
   "Test Type": "testType",
   "Tester Type": "testerType",
   "Issue Source": "issueSource",
-  "Issue Found": "issueFound",
   "Key Point": "keyPoint",
+  "Original Feedback": "originalFeedback",
+  "Test Results": "testResults",
+  "Feature Requests": "featureRequests",
+  "Communication Follow-up": "communicationFollowUp",
   Severity: "severity",
   Priority: "priority",
   Status: "status",
@@ -1934,7 +1956,6 @@ const BETA_FIELD_TO_RECORD_KEY = {
   "Resolved Date": "resolvedDate",
   "Related Request Number": "relatedRequestNumber",
   "Related Firmware Version": "relatedFirmwareVersion",
-  Notes: "notes",
 };
 
 function betaOriginalEditableValues(record) {
@@ -1961,6 +1982,9 @@ function applySavedBetaChanges(record, changes, result = {}) {
     const key = BETA_FIELD_TO_RECORD_KEY[field];
     if (key) record[key] = value;
   });
+  if (Object.prototype.hasOwnProperty.call(changes, "Original Feedback")) record.rawInput = record.originalFeedback;
+  if (Object.prototype.hasOwnProperty.call(changes, "Test Results")) record.issueFound = record.testResults;
+  if (Object.prototype.hasOwnProperty.call(changes, "Communication Follow-up")) record.notes = record.communicationFollowUp;
   if (result.editLog !== undefined) record.editLog = result.editLog;
 }
 
@@ -2334,7 +2358,11 @@ function validateFirmwareRows(rows) {
 function validateBetaRows(rows) {
   if (!rows.length) return [];
   const headers = rows.length ? Object.keys(rows[0]) : [];
-  return BETA_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
+  const missing = BETA_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
+  BETA_CONTENT_HEADER_GROUPS.forEach((group) => {
+    if (!group.some((header) => headers.includes(header))) missing.push(group[0]);
+  });
+  return missing;
 }
 
 async function loadFirmwareRecords() {
@@ -2361,7 +2389,7 @@ async function loadBetaRecords() {
   }
   return rows
     .map(normalizeBetaRow)
-    .filter((record) => record.date || record.productModel || record.issueFound || record.rawInput);
+    .filter((record) => record.date || record.productModel || record.keyPoint || record.originalFeedback || record.testResults);
 }
 
 async function load() {
