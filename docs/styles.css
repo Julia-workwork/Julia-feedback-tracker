@@ -1733,9 +1733,9 @@ body {
 .beta-input-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  gap: 16px;
   border-top: 1px solid rgb(255 255 255 / 12%);
-  padding: 18px 24px 24px;
+  padding: 18px clamp(18px, 2vw, 30px) 24px;
 }
 
 .feedback-input-form > .feedback-wide-field,
@@ -1789,7 +1789,7 @@ body {
 .beta-input-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 10px 12px;
+  gap: 12px 16px;
   align-items: end;
 }
 
@@ -1810,48 +1810,59 @@ body {
 }
 
 .beta-field-test-item {
-  grid-column: span 5;
+  grid-column: span 4;
 }
 
 .beta-field-test-type,
 .beta-field-tester-type {
-  grid-column: span 3;
+  grid-column: span 4;
 }
 
 .beta-draft-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 12px;
-  align-items: end;
+  gap: 12px 16px;
+  align-items: start;
 }
 
 .beta-field-issue {
+  order: 1;
   grid-column: span 7;
 }
 
 .beta-field-key-point {
+  order: 2;
   grid-column: span 5;
 }
 
 .beta-field-feature-requests {
-  grid-column: span 7;
+  order: 3;
+  grid-column: span 6;
 }
 
 .beta-field-severity {
+  order: 5;
   grid-column: span 2;
 }
 
-.beta-field-priority,
+.beta-field-priority {
+  order: 6;
+  grid-column: span 2;
+}
+
 .beta-field-status {
+  order: 7;
   grid-column: span 2;
 }
 
 .beta-field-next-action {
-  grid-column: span 5;
+  order: 4;
+  grid-column: span 6;
 }
 
 .beta-field-follow-up {
-  grid-column: span 7;
+  order: 8;
+  grid-column: span 6;
 }
 
 .beta-field-issue textarea,
@@ -1859,24 +1870,24 @@ body {
 .beta-field-feature-requests textarea,
 .beta-field-next-action textarea,
 .beta-field-follow-up textarea {
-  min-height: 82px;
+  min-height: 76px;
 }
 
 .beta-field-issue textarea {
-  min-height: 104px;
+  min-height: 78px;
 }
 
 .beta-field-key-point textarea {
-  min-height: 104px;
+  min-height: 78px;
 }
 
 .beta-field-feature-requests textarea {
-  min-height: 90px;
+  min-height: 72px;
 }
 
 .beta-field-next-action textarea,
 .beta-field-follow-up textarea {
-  min-height: 96px;
+  min-height: 86px;
   border-color: rgba(242, 194, 48, 0.72);
   background: #fffaf0;
 }
@@ -2258,41 +2269,48 @@ body {
   .beta-input-grid,
   .beta-draft-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px 12px;
   }
 
   .beta-field-date,
+  .beta-field-version {
+    grid-column: span 2;
+  }
+
+  .beta-field-model,
+  .beta-field-owner,
+  .beta-field-test-item,
+  .beta-field-test-type,
+  .beta-field-tester-type {
+    grid-column: span 3;
+  }
+
+  .beta-field-issue,
+  .beta-field-feature-requests,
+  .beta-field-next-action,
+  .beta-field-follow-up {
+    grid-column: span 4;
+  }
+
+  .beta-field-key-point,
   .beta-field-severity,
   .beta-field-priority,
   .beta-field-status {
     grid-column: span 2;
   }
 
-  .beta-field-model,
-  .beta-field-version,
-  .beta-field-owner,
-  .beta-field-test-type,
-  .beta-field-tester-type {
-    grid-column: span 3;
-  }
-
-  .beta-field-test-item,
-  .beta-field-issue,
-  .beta-field-key-point,
-  .beta-field-feature-requests,
-  .beta-field-next-action,
-  .beta-field-follow-up {
-    grid-column: 1 / -1;
+  .beta-field-issue textarea,
+  .beta-field-key-point textarea,
+  .beta-field-feature-requests textarea,
+  .beta-field-next-action textarea,
+  .beta-field-follow-up textarea {
+    min-height: 88px;
   }
 
   .beta-card-date {
     border-right: 0;
     border-bottom: 1px solid #e6ebf2;
     padding: 0 0 10px;
-  }
-
-  .beta-draft-grid label:first-child,
-  .beta-draft-grid label:last-child {
-    grid-column: auto;
   }
 
   .firmware-card {
@@ -2421,19 +2439,51 @@ body {
     font-size: clamp(1.8rem, 9vw, 2.9rem);
   }
 
-  .beta-field-test-item,
+  .beta-input-form {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .beta-input-grid,
+  .beta-draft-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .beta-input-form input,
+  .beta-input-form select {
+    min-height: 38px;
+    padding: 9px 13px;
+  }
+
+  .beta-raw-field textarea {
+    min-height: 92px;
+  }
+
+  .beta-field-issue textarea,
+  .beta-field-key-point textarea,
+  .beta-field-feature-requests textarea,
+  .beta-field-next-action textarea,
+  .beta-field-follow-up textarea {
+    min-height: 82px;
+  }
+
   .beta-field-test-type,
   .beta-field-tester-type,
-  .beta-field-model,
   .beta-field-version,
+  .beta-field-date,
+  .beta-field-severity,
+  .beta-field-priority,
+  .beta-field-status {
+    grid-column: span 1;
+  }
+
+  .beta-field-test-item,
+  .beta-field-model,
   .beta-field-owner,
   .beta-field-issue,
   .beta-field-key-point,
   .beta-field-feature-requests,
-  .beta-field-date,
-  .beta-field-severity,
-  .beta-field-priority,
-  .beta-field-status,
   .beta-field-next-action,
   .beta-field-follow-up {
     grid-column: 1 / -1;
@@ -2448,5 +2498,30 @@ body {
 
   .firmware-card time {
     justify-self: start;
+  }
+}
+
+@media (max-width: 520px) {
+  .beta-input-grid,
+  .beta-draft-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .beta-field-date,
+  .beta-field-model,
+  .beta-field-version,
+  .beta-field-owner,
+  .beta-field-test-item,
+  .beta-field-test-type,
+  .beta-field-tester-type,
+  .beta-field-issue,
+  .beta-field-key-point,
+  .beta-field-feature-requests,
+  .beta-field-severity,
+  .beta-field-priority,
+  .beta-field-status,
+  .beta-field-next-action,
+  .beta-field-follow-up {
+    grid-column: 1 / -1;
   }
 }
