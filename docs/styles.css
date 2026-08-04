@@ -755,6 +755,7 @@ body {
 .feedback-category-field {
   display: grid;
   gap: 8px;
+  align-self: stretch;
   min-width: 0;
   border: 0;
   margin: 0;
@@ -770,29 +771,33 @@ body {
 }
 
 .feedback-category-options {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 8px;
-  min-height: 44px;
+  min-height: 40px;
+  align-content: start;
   align-items: center;
+  justify-content: start;
   border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 22px;
+  border-radius: 18px;
   background: #ffffff;
-  padding: 8px;
+  padding: 10px;
 }
 
 .category-choice {
   appearance: none;
   background: #ffffff;
   border: 1px solid rgb(0 0 0 / 12%);
-  border-radius: 999px;
+  border-radius: 12px;
   color: #11161d;
   cursor: pointer;
   font-size: 0.72rem;
   font-weight: 900;
-  line-height: 1;
-  min-height: 28px;
-  padding: 6px 10px;
+  line-height: 1.12;
+  min-height: 32px;
+  padding: 7px 10px;
+  text-align: center;
+  white-space: normal;
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -1793,6 +1798,39 @@ body {
   align-items: end;
 }
 
+.feedback-input-form .beta-input-grid {
+  grid-template-columns: repeat(12, minmax(72px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.feedback-field-date {
+  grid-column: span 2;
+}
+
+.feedback-field-model,
+.feedback-field-user,
+.feedback-field-email {
+  grid-column: span 3;
+}
+
+.feedback-category-field {
+  grid-column: span 6;
+}
+
+.feedback-field-priority {
+  grid-column: span 2;
+}
+
+.feedback-field-request,
+.feedback-field-channel {
+  grid-column: span 3;
+}
+
+.feedback-field-status {
+  grid-column: span 2;
+}
+
 .beta-field-date {
   grid-column: span 2;
 }
@@ -2489,6 +2527,28 @@ body {
     grid-column: 1 / -1;
   }
 
+  .feedback-input-form .beta-input-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .feedback-field-date,
+  .feedback-field-priority,
+  .feedback-field-status {
+    grid-column: span 2;
+  }
+
+  .feedback-field-model,
+  .feedback-field-user,
+  .feedback-field-email,
+  .feedback-field-request,
+  .feedback-field-channel {
+    grid-column: span 3;
+  }
+
+  .feedback-category-field {
+    grid-column: 1 / -1;
+  }
+
   .filter-bar > #refresh-button,
   .filter-bar .filter-more-toggle,
   .filter-bar .date-range-filter {
@@ -2523,5 +2583,25 @@ body {
   .beta-field-next-action,
   .beta-field-follow-up {
     grid-column: 1 / -1;
+  }
+
+  .feedback-input-form .beta-input-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .feedback-field-date,
+  .feedback-field-model,
+  .feedback-field-user,
+  .feedback-field-email,
+  .feedback-category-field,
+  .feedback-field-priority,
+  .feedback-field-request,
+  .feedback-field-channel,
+  .feedback-field-status {
+    grid-column: 1 / -1;
+  }
+
+  .feedback-category-options {
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   }
 }

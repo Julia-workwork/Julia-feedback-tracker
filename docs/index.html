@@ -110,19 +110,19 @@
               <textarea id="feedback-raw-input" rows="5" placeholder="Paste user original words, date, model, channel, user name, or other scattered info..."></textarea>
             </label>
             <div class="beta-input-grid">
-              <label>
+              <label class="feedback-field-date">
                 Date
                 <input id="feedback-input-date" type="date" />
               </label>
-              <label>
+              <label class="feedback-field-model">
                 Product Model
                 <input id="feedback-input-model" placeholder="HA2, HD1, H1..." />
               </label>
-              <label>
+              <label class="feedback-field-user">
                 User ID
                 <input id="feedback-input-id" placeholder="User name or account" />
               </label>
-              <label>
+              <label class="feedback-field-email">
                 Email
                 <input id="feedback-input-email" type="email" placeholder="user@example.com" />
               </label>
@@ -139,7 +139,7 @@
                   <button class="category-choice category-negative-review" type="button" data-category="Negative review" aria-pressed="false">Negative review</button>
                 </div>
               </fieldset>
-              <label>
+              <label class="feedback-field-priority">
                 Priority
                 <select id="feedback-input-priority">
                   <option value="">-</option>
@@ -148,15 +148,15 @@
                   <option selected>P2</option>
                 </select>
               </label>
-              <label>
+              <label class="feedback-field-request">
                 Request number
                 <input id="feedback-input-request" placeholder="RT20260620001" />
               </label>
-              <label>
+              <label class="feedback-field-channel">
                 Channel
                 <input id="feedback-input-channel" placeholder="Email, Facebook, WhatsApp..." />
               </label>
-              <label>
+              <label class="feedback-field-status">
                 Status
                 <select id="feedback-input-status">
                   <option selected>To Submit</option>
