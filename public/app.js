@@ -26,7 +26,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260621-module-permissions";
+} from "./lib/domain.mjs?v=20260804-beta-detail-sync";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -55,13 +55,76 @@ const SHEET_HEADERS_BY_POSITION = [
   "Status Change Log",
 ];
 const FIRMWARE_REQUIRED_HEADERS = ["Date", "Model", "Firmware Version", "Change log", "更新日志", "关闭需求"];
-const BETA_REQUIRED_HEADERS = ["Date", "Product Model", "Version", "Issue Found", "Status", "Raw Input"];
+const BETA_REQUIRED_HEADERS = ["Date", "Product Model", "Version", "Status"];
+const BETA_CONTENT_HEADER_GROUPS = [
+  ["Original Feedback", "Raw Input", "Input Area"],
+  ["Test Results", "Issue Found"],
+];
 const EXPECTED_SHEET_HEADERS = new Set([
   ...SHEET_HEADERS_BY_POSITION,
   ...FIRMWARE_REQUIRED_HEADERS,
   ...BETA_TEST_HEADERS,
 ]);
 const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
+const BETA_TEST_TYPE_OPTIONS = ["Firmware", "APP", "CPS", "Hardware", "Accessory"];
+const BETA_TESTER_TYPE_OPTIONS = ["Internal Test", "User Beta Test", "Engineer Test", "KOC Test"];
+const BETA_ISSUE_SOURCE_OPTIONS = ["User Report", "Internal Found", "Regression", "Known Issue"];
+const BETA_STATUS_OPTIONS = ["Open", "Need Review", "Reproducing", "In Progress", "Resolved", "Closed"];
+const FEEDBACK_STATUS_OPTIONS = [
+  ["todo", "To Submit"],
+  ["submitted", "Submitted"],
+  ["inProgress", "In Progress"],
+  ["resolved", "Resolved"],
+  ["notAccepted", "Not Accepted"],
+];
+const BETA_SEVERITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
+const BETA_PRIORITY_OPTIONS = ["P0", "P1", "P2"];
+
+function cleanBetaField(value) {
+  return String(value ?? "").trim();
+}
+
+function buildBetaCreateRow(fields = {}) {
+  const explicitOriginalFeedback = cleanBetaField(fields.originalFeedback);
+  const originalFeedback = explicitOriginalFeedback || cleanBetaField(fields.rawInput);
+
+  return {
+    Date: cleanBetaField(fields.date),
+    "Product Model": cleanBetaField(fields.productModel ?? fields.model),
+    Version: cleanBetaField(fields.version),
+    "Test Item": cleanBetaField(fields.testItem),
+    "Test Type": cleanBetaField(fields.testType),
+    "Tester Type": cleanBetaField(fields.testerType),
+    "Tester / Owner": cleanBetaField(fields.testerOwner),
+    "Issue Source": cleanBetaField(fields.issueSource) || "User Report",
+    "Test Results": cleanBetaField(fields.testResults),
+    "Feature Requests": cleanBetaField(fields.featureRequests),
+    "Key Point": cleanBetaField(fields.keyPoint),
+    "Original Feedback": originalFeedback,
+    Severity: cleanBetaField(fields.severity),
+    Priority: cleanBetaField(fields.priority),
+    Status: cleanBetaField(fields.status),
+    "Communication Follow-up": cleanBetaField(fields.communicationFollowUp),
+    "Assigned To": cleanBetaField(fields.assignedTo),
+    "Engineering Response": cleanBetaField(fields.engineeringResponse),
+    "Next Action": cleanBetaField(fields.nextAction),
+    "Target Date": cleanBetaField(fields.targetDate),
+    "Resolved Date": cleanBetaField(fields.resolvedDate),
+    "Related Request Number": cleanBetaField(fields.relatedRequestNumber),
+    "Related Firmware Version": cleanBetaField(fields.relatedFirmwareVersion ?? fields.version),
+    "Edit Log": cleanBetaField(fields.editLog),
+  };
+}
+
+const FEEDBACK_CATEGORY_OPTIONS = [
+  "BUG",
+  "Feature Request",
+  "Feature Enhancement",
+  "CPS",
+  "APP",
+  "Positive review",
+  "Negative review",
+];
 const HERO_COPY = {
   feedback: {
     eyebrow: "Julia's Feedback Tracker",
@@ -85,7 +148,10 @@ const state = {
   firmwareRecords: [],
   betaRecords: [],
   firmwareLookup: new Map(),
+  currentDetailRecord: null,
+  currentBetaDetailRecord: null,
   activeView: "feedback",
+  betaSyncInFlight: false,
   summaryFilter: "",
   filters: {
     model: "all",
@@ -150,6 +216,7 @@ const elements = {
   feedbackInputId: document.querySelector("#feedback-input-id"),
   feedbackInputEmail: document.querySelector("#feedback-input-email"),
   feedbackInputCategory: document.querySelector("#feedback-input-category"),
+  feedbackInputCategoryOptions: document.querySelector("#feedback-input-category-options"),
   feedbackInputPriority: document.querySelector("#feedback-input-priority"),
   feedbackInputRequest: document.querySelector("#feedback-input-request"),
   feedbackInputChannel: document.querySelector("#feedback-input-channel"),
@@ -172,6 +239,9 @@ const elements = {
   firmwareDateFrom: document.querySelector("#firmware-date-from-filter"),
   firmwareDateTo: document.querySelector("#firmware-date-to-filter"),
   firmwareRefresh: document.querySelector("#firmware-refresh-button"),
+  firmwareFilterBar: document.querySelector("#firmware-filter-bar"),
+  firmwareFilterToggle: document.querySelector("#firmware-filter-toggle"),
+  firmwareFilterSummary: document.querySelector("#firmware-filter-summary"),
   firmwareSummary: document.querySelector("#firmware-summary"),
   firmwareMessage: document.querySelector("#firmware-message"),
   firmwareList: document.querySelector("#firmware-list"),
@@ -187,10 +257,12 @@ const elements = {
   betaInputTesterOwner: document.querySelector("#beta-input-tester-owner"),
   betaInputIssueFound: document.querySelector("#beta-input-issue-found"),
   betaInputKeyPoint: document.querySelector("#beta-input-key-point"),
+  betaInputFeatureRequests: document.querySelector("#beta-input-feature-requests"),
   betaInputSeverity: document.querySelector("#beta-input-severity"),
   betaInputPriority: document.querySelector("#beta-input-priority"),
   betaInputStatus: document.querySelector("#beta-input-status"),
   betaInputNextAction: document.querySelector("#beta-input-next-action"),
+  betaInputNotes: document.querySelector("#beta-input-notes"),
   betaAnalyze: document.querySelector("#beta-analyze-button"),
   betaSave: document.querySelector("#beta-save-button"),
   betaClear: document.querySelector("#beta-clear-button"),
@@ -204,6 +276,9 @@ const elements = {
   betaDateFrom: document.querySelector("#beta-date-from-filter"),
   betaDateTo: document.querySelector("#beta-date-to-filter"),
   betaRefresh: document.querySelector("#beta-refresh-button"),
+  betaFilterBar: document.querySelector("#beta-filter-bar"),
+  betaFilterToggle: document.querySelector("#beta-filter-toggle"),
+  betaFilterSummary: document.querySelector("#beta-filter-summary"),
   betaSummary: document.querySelector("#beta-summary"),
   betaMessage: document.querySelector("#beta-message"),
   betaList: document.querySelector("#beta-list"),
@@ -260,6 +335,18 @@ function canEdit(module = "feedback") {
 
 function isAdmin() {
   return String(state.auth?.role || "").trim() === "Admin";
+}
+
+function hideIdentityInOperationalView() {
+  return !isAdmin() && state.activeView !== "feedback";
+}
+
+function hideIdentityForDetail(options = {}) {
+  return !isAdmin();
+}
+
+function privateIdentityText(value, options = {}) {
+  return hideIdentityForDetail(options) ? "-" : value;
 }
 
 function updateBetaInputAccess() {
@@ -426,14 +513,17 @@ function renderFirmwareFilterOptions() {
   elements.firmwareVersion.value = versions.includes(currentVersion) ? currentVersion : "all";
   state.firmwareFilters.model = elements.firmwareModel.value;
   state.firmwareFilters.version = elements.firmwareVersion.value;
+  updateFirmwareFilterSummary();
 }
 
 function renderBetaFilterOptions() {
   const currentModel = elements.betaModel.value;
   const currentVersion = elements.betaVersion.value;
+  const currentTesterType = elements.betaTesterType.value;
   const models = uniqueBetaModels(state.betaRecords);
   const selectedModel = models.includes(currentModel) ? currentModel : "all";
   const versions = uniqueBetaVersions(state.betaRecords, selectedModel);
+  const testerTypes = selectOptionsFromRecords(state.betaRecords, "testerType", BETA_TESTER_TYPE_OPTIONS);
 
   elements.betaModel.innerHTML = `<option value="all">All Models</option>${models
     .map((model) => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`)
@@ -441,23 +531,100 @@ function renderBetaFilterOptions() {
   elements.betaVersion.innerHTML = `<option value="all">All Versions</option>${versions
     .map((version) => `<option value="${escapeHtml(version)}">${escapeHtml(version)}</option>`)
     .join("")}`;
+  renderSelectOptions(elements.betaTesterType, testerTypes, currentTesterType, "All Tester Types");
 
   elements.betaModel.value = selectedModel;
   elements.betaVersion.value = versions.includes(currentVersion) ? currentVersion : "all";
   state.betaFilters.model = elements.betaModel.value;
   state.betaFilters.version = elements.betaVersion.value;
+  state.betaFilters.testerType = elements.betaTesterType.value;
+  renderBetaInputOptions();
+  updateBetaFilterSummary();
+}
+
+function selectOptionsFromRecords(records, field, defaults = []) {
+  const values = new Set(defaults.filter(Boolean));
+  records.forEach((record) => {
+    const value = String(record[field] || "").trim();
+    if (value) values.add(value);
+  });
+  return [...values].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+function renderSelectOptions(select, options, currentValue, placeholder = "-") {
+  const allOptions = [...new Set([currentValue, ...options].filter(Boolean))];
+  select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>${allOptions
+    .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
+    .join("")}`;
+  select.value = allOptions.includes(currentValue) ? currentValue : "";
+}
+
+function renderBetaInputOptions() {
+  renderSelectOptions(
+    elements.betaInputTestType,
+    selectOptionsFromRecords(state.betaRecords, "testType", BETA_TEST_TYPE_OPTIONS),
+    elements.betaInputTestType.value,
+  );
+  renderSelectOptions(
+    elements.betaInputTesterType,
+    selectOptionsFromRecords(state.betaRecords, "testerType", BETA_TESTER_TYPE_OPTIONS),
+    elements.betaInputTesterType.value,
+  );
+}
+
+function toggleModuleFilters(module, shouldExpand) {
+  const bar = module === "firmware" ? elements.firmwareFilterBar : elements.betaFilterBar;
+  const button = module === "firmware" ? elements.firmwareFilterToggle : elements.betaFilterToggle;
+  if (!bar || !button) return;
+  bar.classList.toggle("is-collapsed", !shouldExpand);
+  button.setAttribute("aria-expanded", String(shouldExpand));
+  button.textContent = shouldExpand ? "Hide filters" : "Show filters";
+}
+
+function dateRangeSummary(from, to) {
+  if (from && to) return `${from} to ${to}`;
+  if (from) return `From ${from}`;
+  if (to) return `To ${to}`;
+  return "No date range";
+}
+
+function updateFirmwareFilterSummary() {
+  if (!elements.firmwareFilterSummary) return;
+  const parts = [
+    state.firmwareFilters.model === "all" ? "All Models" : state.firmwareFilters.model,
+    state.firmwareFilters.version === "all" ? "All Versions" : state.firmwareFilters.version,
+    state.firmwareFilters.search ? `Search: ${state.firmwareFilters.search}` : "",
+    dateRangeSummary(state.firmwareFilters.dateFrom, state.firmwareFilters.dateTo),
+  ].filter(Boolean);
+  elements.firmwareFilterSummary.textContent = parts.join(" · ");
+}
+
+function updateBetaFilterSummary() {
+  if (!elements.betaFilterSummary) return;
+  const parts = [
+    state.betaFilters.model === "all" ? "All Models" : state.betaFilters.model,
+    state.betaFilters.version === "all" ? "All Versions" : state.betaFilters.version,
+    state.betaFilters.testerType || "All Tester Types",
+    state.betaFilters.status || "All Statuses",
+    state.betaFilters.priority || "All Priorities",
+    state.betaFilters.search ? `Search: ${state.betaFilters.search}` : "",
+    dateRangeSummary(state.betaFilters.dateFrom, state.betaFilters.dateTo),
+  ].filter(Boolean);
+  elements.betaFilterSummary.textContent = parts.join(" · ");
 }
 
 function renderSummary(records) {
   const summary = summarizeFeedback(records);
   const percentages = summaryPercentages(summary);
+  const statusCounts = summary.statusCounts || {};
   const items = [
     ["total", "Total", summary.total, "summary-total", ""],
-    ["todo", "To Submit", summary.statusCounts.todo, "summary-todo", percentages.todo],
-    ["submitted", "Submitted", summary.statusCounts.submitted, "summary-submitted", percentages.submitted],
-    ["inProgress", "In Progress", summary.statusCounts.inProgress, "summary-progress", percentages.inProgress],
-    ["resolved", "Resolved", summary.statusCounts.resolved, "summary-resolved", percentages.resolved],
+    ["todo", "To Submit", statusCounts.todo || 0, "summary-todo", percentages.todo],
+    ["submitted", "Submitted", statusCounts.submitted || 0, "summary-submitted", percentages.submitted],
+    ["inProgress", "In Progress", statusCounts.inProgress || 0, "summary-progress", percentages.inProgress],
+    ["resolved", "Resolved", statusCounts.resolved || 0, "summary-resolved", percentages.resolved],
     ["unresolvedBug", "Unresolved BUG", summary.unresolvedBugs, "summary-bug", percentages.unresolvedBug],
+    ["notAccepted", "Not Accepted", statusCounts.notAccepted || 0, "summary-not-accepted", percentages.notAccepted],
   ];
   elements.summary.innerHTML = items
     .map(
@@ -520,6 +687,9 @@ function applySummaryFilter(records) {
   }
   if (state.summaryFilter === "resolved") {
     return records.filter((record) => record.status === "resolved");
+  }
+  if (state.summaryFilter === "notAccepted") {
+    return records.filter((record) => record.status === "notAccepted");
   }
   if (state.summaryFilter === "unresolvedBug") {
     return records.filter((record) => record.status !== "resolved" && record.categories.includes("BUG"));
@@ -607,8 +777,10 @@ function firmwareCardTemplate(release, index) {
   return `
     <article class="firmware-card">
       <div class="firmware-title">
-        <p>${escapeHtml(release.model || "-")}</p>
-        <h2>${escapeHtml(release.version || "Unknown version")}</h2>
+        <button class="firmware-title-toggle" type="button" data-release-index="${index}" aria-label="Open firmware details for ${escapeHtml(release.version || "Unknown version")}">
+          <p>${escapeHtml(release.model || "-")}</p>
+          <h2>${escapeHtml(release.version || "Unknown version")}</h2>
+        </button>
       </div>
       ${
         metadata.length
@@ -692,7 +864,22 @@ function betaSeverityClass(severity) {
   return "severity-unknown";
 }
 
+function dateSortValue(value) {
+  const text = cleanText(value);
+  if (!text) return 0;
+  const parsed = Date.parse(text);
+  if (!Number.isNaN(parsed)) return parsed;
+  const slashDate = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    return new Date(Number(slashDate[3]), Number(slashDate[1]) - 1, Number(slashDate[2])).getTime();
+  }
+  return 0;
+}
+
 function betaRecordTemplate(record, index) {
+  const testerOwner = hideIdentityInOperationalView()
+    ? ""
+    : `<strong>${escapeHtml(record.testerOwner || "-")}</strong>`;
   const chips = [
     record.severity ? `<span class="severity-pill ${betaSeverityClass(record.severity)}">${escapeHtml(record.severity)}</span>` : "",
     record.priority ? `<span class="priority-pill">${escapeHtml(record.priority)}</span>` : "",
@@ -702,9 +889,14 @@ function betaRecordTemplate(record, index) {
     .join("");
   return `
     <article class="beta-card" data-beta-index="${index}" role="button" tabindex="0">
-      <div>
-        <p>${escapeHtml(record.productModel || "-")}</p>
-        <h3>${escapeHtml(record.keyPoint || record.issueFound || record.rawInput || "No key point")}</h3>
+      <div class="beta-card-date">
+        <strong>${escapeHtml(record.date || "-")}</strong>
+        <strong>${escapeHtml(record.productModel || "-")}</strong>
+        ${testerOwner}
+      </div>
+      <div class="beta-card-main">
+        <p>${escapeHtml(record.testItem || "-")}</p>
+        <h3>${escapeHtml(record.keyPoint || "No key point")}</h3>
       </div>
       <div class="beta-card-meta">
         <span>${escapeHtml(record.version || "-")}</span>
@@ -726,9 +918,11 @@ function textareaTemplate(name, value, rows = 4) {
 }
 
 function betaSelectTemplate(name, value, options) {
+  const allOptions = [...new Set([value, ...options].filter(Boolean))];
   return `
     <select name="${escapeHtml(name)}">
-      ${options
+      <option value="">-</option>
+      ${allOptions
         .map((option) => `<option value="${escapeHtml(option)}"${option === value ? " selected" : ""}>${escapeHtml(option || "-")}</option>`)
         .join("")}
     </select>
@@ -739,8 +933,120 @@ function betaEditableRow(record, header, value, fieldHtml, size = "medium") {
   return canEdit("beta") ? editableDetailRow(betaDetailLabel(header), fieldHtml, size) : detailRow(betaDetailLabel(header), value);
 }
 
+const BETA_EDIT_LOG_FIELDS = [
+  "Version",
+  "Test Item",
+  "Test Type",
+  "Tester Type",
+  "Issue Source",
+  "Key Point",
+  "Original Feedback",
+  "Test Results",
+  "Feature Requests",
+  "Communication Follow-up",
+  "Severity",
+  "Priority",
+  "Status",
+  "Assigned To",
+  "Engineering Response",
+  "Next Action",
+  "Target Date",
+  "Resolved Date",
+  "Related Request Number",
+  "Related Firmware Version",
+];
+
+function betaEditLogEntries(value) {
+  const text = cleanText(value);
+  if (!text) return [];
+
+  return text
+    .split(/\n(?=\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}:\d{2})?\s*·)/)
+    .map((entry) => {
+      const match = entry.match(
+        /^(\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}:\d{2})?)\s*·\s*([^:]+):\s*([\s\S]*)$/,
+      );
+      if (!match) return "Earlier edit · Updated: Record";
+
+      const [, timestamp, actor, detail] = match;
+      const concise = detail.match(/^Updated:\s*([^\n]+)$/i);
+      if (concise) {
+        return `${timestamp} · ${actor.trim()} · Updated: ${concise[1].trim()}`;
+      }
+
+      const normalizedDetail = detail.toLowerCase();
+      const fields = BETA_EDIT_LOG_FIELDS.filter((field) =>
+        normalizedDetail.includes(`updated ${field.toLowerCase()}`),
+      );
+      return `${timestamp} · ${actor.trim()} · Updated: ${fields.join(", ") || "Record"}`;
+    })
+    .filter(Boolean);
+}
+
+function betaEditLogTemplate(value) {
+  const entries = betaEditLogEntries(value);
+  return `<div class="beta-edit-log">
+    <dt>Edit Log</dt>
+    <dd>${
+      entries.length
+        ? `<ul>${entries.map((entry) => `<li>${escapeHtml(entry)}</li>`).join("")}</ul>`
+        : "-"
+    }</dd>
+  </div>`;
+}
+
+function betaFullDetail(record) {
+  const rows = [
+    `Date: ${record.date || "-"}`,
+    `Product Model: ${record.productModel || "-"}`,
+    `Version: ${record.version || "-"}`,
+    `Test Item: ${record.testItem || "-"}`,
+    `Test Type: ${record.testType || "-"}`,
+    `Tester Type: ${record.testerType || "-"}`,
+    `Issue Source: ${record.issueSource || "-"}`,
+    `Key Point: ${record.keyPoint || "-"}`,
+    `Original Feedback: ${record.originalFeedback || "-"}`,
+    `Test Results: ${record.testResults || "-"}`,
+    `Feature Requests: ${record.featureRequests || "-"}`,
+    `Communication Follow-up: ${record.communicationFollowUp || "-"}`,
+    `Severity: ${record.severity || "-"}`,
+    `Priority: ${record.priority || "-"}`,
+    `Status: ${record.status || "-"}`,
+    `Assigned To: ${record.assignedTo || "-"}`,
+    `Engineering Response: ${record.engineeringResponse || "-"}`,
+    `Next Action: ${record.nextAction || "-"}`,
+    `Target Date: ${record.targetDate || "-"}`,
+    `Resolved Date: ${record.resolvedDate || "-"}`,
+    `Related Request Number: ${record.relatedRequestNumber || "-"}`,
+    `Related Firmware Version: ${record.relatedFirmwareVersion || "-"}`,
+    `Edit Log: ${betaEditLogEntries(record.editLog).join("\n") || "-"}`,
+  ];
+  if (!hideIdentityInOperationalView()) {
+    rows.splice(6, 0, `Tester / Owner: ${record.testerOwner || "-"}`);
+  }
+  return rows.join("\n");
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
+
 function openBetaDetail(record) {
-  document.body.classList.add("detail-open");
+  state.currentDetailRecord = null;
+  state.currentBetaDetailRecord = record;
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
     <div class="detail-panel__header">
@@ -751,9 +1057,10 @@ function openBetaDetail(record) {
           ${record.status ? `<span class="status-pill">${escapeHtml(record.status)}</span>` : ""}
         </div>
         <p class="beta-detail-heading">${escapeHtml(betaDetailHeading(record) || "Beta test detail")}</p>
-        <h2>${escapeHtml(record.issueFound || "Beta test detail")}</h2>
+        <h2>${escapeHtml(record.keyPoint || "No key point")}</h2>
       </div>
       <div class="detail-actions">
+        <button class="copy-beta-detail" type="button">Copy Full Info</button>
         <button type="button" id="close-detail">Close</button>
       </div>
     </div>
@@ -766,30 +1073,33 @@ function openBetaDetail(record) {
         record,
         "Test Type",
         record.testType,
-        betaSelectTemplate("Test Type", record.testType, ["", "Firmware Beta", "APP Beta", "CPS Beta", "Hardware Test", "Regression Test"]),
+        betaSelectTemplate("Test Type", record.testType, selectOptionsFromRecords(state.betaRecords, "testType", BETA_TEST_TYPE_OPTIONS)),
       )}
       ${betaEditableRow(
         record,
         "Tester Type",
         record.testerType,
-        betaSelectTemplate("Tester Type", record.testerType, ["", "Internal Test", "User Beta Test", "Engineer Test", "KOC Test"]),
+        betaSelectTemplate("Tester Type", record.testerType, selectOptionsFromRecords(state.betaRecords, "testerType", BETA_TESTER_TYPE_OPTIONS)),
       )}
-      ${detailRow("Tester / Owner", record.testerOwner)}
+      ${hideIdentityInOperationalView() ? "" : detailRow("Tester / Owner", record.testerOwner)}
       ${betaEditableRow(
         record,
         "Issue Source",
         record.issueSource,
-        betaSelectTemplate("Issue Source", record.issueSource, ["", "Internal Test", "User Beta Test", "Engineer Test", "KOC Test", "User Feedback", "Internal QA"]),
+        betaSelectTemplate("Issue Source", record.issueSource, selectOptionsFromRecords(state.betaRecords, "issueSource", BETA_ISSUE_SOURCE_OPTIONS)),
       )}
-      ${betaEditableRow(record, "Issue Found", record.issueFound, textareaTemplate("Issue Found", record.issueFound, 4), "wide")}
       ${betaEditableRow(record, "Key Point", record.keyPoint, textareaTemplate("Key Point", record.keyPoint, 3), "wide")}
-      ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, ["", "Critical", "High", "Medium", "Low"]), "short")}
-      ${betaEditableRow(record, "Priority", record.priority, betaSelectTemplate("Priority", record.priority, ["", "P0", "P1", "P2"]), "short")}
+      ${betaEditableRow(record, "Original Feedback", record.originalFeedback, textareaTemplate("Original Feedback", record.originalFeedback, 5), "wide")}
+      ${betaEditableRow(record, "Test Results", record.testResults, textareaTemplate("Test Results", record.testResults, 4), "wide")}
+      ${betaEditableRow(record, "Feature Requests", record.featureRequests, textareaTemplate("Feature Requests", record.featureRequests, 4), "wide")}
+      ${betaEditableRow(record, "Communication Follow-up", record.communicationFollowUp, textareaTemplate("Communication Follow-up", record.communicationFollowUp, 5), "wide")}
+      ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, BETA_SEVERITY_OPTIONS), "short")}
+      ${betaEditableRow(record, "Priority", record.priority, betaSelectTemplate("Priority", record.priority, BETA_PRIORITY_OPTIONS), "short")}
       ${betaEditableRow(
         record,
         "Status",
         record.status,
-        betaSelectTemplate("Status", record.status, ["", "Open", "Need Review", "Reproducing", "In Progress", "Resolved", "Closed"]),
+        betaSelectTemplate("Status", record.status, BETA_STATUS_OPTIONS),
         "short",
       )}
       ${betaEditableRow(record, "Assigned To", record.assignedTo, inputTemplate("Assigned To", record.assignedTo))}
@@ -799,11 +1109,14 @@ function openBetaDetail(record) {
       ${betaEditableRow(record, "Resolved Date", record.resolvedDate, inputTemplate("Resolved Date", record.resolvedDate, "date"), "short")}
       ${betaEditableRow(record, "Related Request Number", record.relatedRequestNumber, inputTemplate("Related Request Number", record.relatedRequestNumber))}
       ${betaEditableRow(record, "Related Firmware Version", record.relatedFirmwareVersion, inputTemplate("Related Firmware Version", record.relatedFirmwareVersion))}
-      ${betaEditableRow(record, "Notes", record.notes, textareaTemplate("Notes", record.notes, 5), "wide")}
-      ${detailRow("Edit Log", record.editLog)}
+      ${betaEditLogTemplate(record.editLog)}
     </dl>
     ${canEdit("beta") ? `<button class="save-detail-changes beta-save-follow-up" type="button">Save Changes</button>` : ""}
   `;
+  elements.detail.querySelector(".copy-beta-detail")?.addEventListener("click", async () => {
+    await copyText(betaFullDetail(record));
+    showToast("Beta detail copied");
+  });
   elements.detail.querySelector(".beta-save-follow-up")?.addEventListener("click", async () => {
     if (!canEdit("beta")) {
       showToast("You do not have permission to edit.");
@@ -818,8 +1131,7 @@ function openBetaDetail(record) {
     try {
       const result = await syncBetaRecordChanges(record, changes);
       applySavedBetaChanges(record, changes, result);
-      renderBeta();
-      openBetaDetail(record);
+      await refreshBetaRecords({ silent: true, keepDetailOpen: true });
       showToast("Changes saved");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Update failed");
@@ -828,14 +1140,13 @@ function openBetaDetail(record) {
     }
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
-    elements.detail.classList.add("is-hidden");
-    document.body.classList.remove("detail-open");
+    closeDetail();
   });
 }
 
 function renderBeta() {
   const visible = filterBetaTests(state.betaRecords, state.betaFilters).sort((a, b) =>
-    String(b.date).localeCompare(String(a.date)),
+    dateSortValue(b.date) - dateSortValue(a.date) || String(b.date).localeCompare(String(a.date)),
   );
   renderBetaSummary(visible);
   if (!state.betaRecords.length && !elements.betaMessage.textContent) {
@@ -860,7 +1171,7 @@ function renderBeta() {
 }
 
 function renderBoard(records) {
-  const columns = ["todo", "submitted", "inProgress", "resolved"];
+  const columns = ["todo", "submitted", "inProgress", "resolved", "notAccepted"];
   elements.board.innerHTML = columns
     .map((status) => {
       const items = records.filter((record) => record.status === status);
@@ -883,6 +1194,10 @@ function renderBoard(records) {
     button.addEventListener("click", (event) => {
       if (event.target.closest(".copy-summary")) return;
       const record = records[Number(button.dataset.index)];
+      if (isDetailOpenForRecord(record)) {
+        closeDetail();
+        return;
+      }
       openDetail(record);
     });
     button.addEventListener("keydown", (event) => {
@@ -890,6 +1205,10 @@ function renderBoard(records) {
       if (event.target.closest(".copy-summary")) return;
       event.preventDefault();
       const record = records[Number(button.dataset.index)];
+      if (isDetailOpenForRecord(record)) {
+        closeDetail();
+        return;
+      }
       openDetail(record);
     });
   });
@@ -905,7 +1224,7 @@ function renderBoard(records) {
 }
 
 function engineerSummary(record) {
-  return [
+  const rows = [
     `Model: ${record.model || "-"}`,
     `Category: ${record.updateCategory || "-"}`,
     `Priority: ${record.priority || "-"}`,
@@ -917,8 +1236,11 @@ function engineerSummary(record) {
     `Chinese: ${record.chinese || "-"}`,
     `Notes: ${record.notes || "-"}`,
     `Channel: ${record.channel || "-"}`,
-    `User ID: ${record.id || "-"}`,
-  ].join("\n");
+  ];
+  if (isAdmin()) {
+    rows.push(`User ID: ${record.id || "-"}`);
+  }
+  return rows.join("\n");
 }
 
 async function copyEngineerSummary(record) {
@@ -968,8 +1290,14 @@ function betaRecordMatchPayload(record) {
     productModel: record.productModel,
     version: record.version,
     testerOwner: record.testerOwner,
-    issueFound: record.issueFound,
-    rawInput: record.rawInput,
+    keyPoint: record.keyPoint,
+    originalFeedback: record.originalFeedback,
+    testResults: record.testResults,
+    featureRequests: record.featureRequests,
+    communicationFollowUp: record.communicationFollowUp,
+    issueFound: record.testResults || record.issueFound,
+    rawInput: record.originalFeedback || record.rawInput,
+    notes: record.communicationFollowUp || record.notes,
   };
 }
 
@@ -1033,6 +1361,49 @@ function syncChangesToGoogleSheet(record, changes) {
       if (payload?.ok) return payload;
       throw new Error(payload?.message || "Update failed.");
     });
+}
+
+function splitFeedbackCategories(value) {
+  const seen = new Set();
+  const categories = String(value || "")
+    .split(/[,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => FEEDBACK_CATEGORY_OPTIONS.find((option) => option.toLowerCase() === item.toLowerCase()) || item)
+    .filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+  return categories;
+}
+
+function syncFeedbackCategoryChoices() {
+  const categories = splitFeedbackCategories(elements.feedbackInputCategory.value);
+  const selected = new Set(categories);
+  elements.feedbackInputCategoryOptions?.querySelectorAll("[data-category]").forEach((button) => {
+    const isSelected = selected.has(button.dataset.category);
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  });
+}
+
+function setFeedbackCategories(value) {
+  elements.feedbackInputCategory.value = splitFeedbackCategories(value).join(", ");
+  syncFeedbackCategoryChoices();
+}
+
+function toggleFeedbackCategory(category) {
+  const selected = new Set(splitFeedbackCategories(elements.feedbackInputCategory.value));
+  if (selected.has(category)) {
+    selected.delete(category);
+  } else {
+    selected.add(category);
+  }
+  const ordered = FEEDBACK_CATEGORY_OPTIONS.filter((option) => selected.has(option));
+  const extras = [...selected].filter((option) => !FEEDBACK_CATEGORY_OPTIONS.includes(option));
+  elements.feedbackInputCategory.value = [...ordered, ...extras].join(", ");
+  syncFeedbackCategoryChoices();
 }
 
 function feedbackPayloadFromInput() {
@@ -1221,7 +1592,7 @@ function analyzeFeedbackInput() {
   if (draft.model && !elements.feedbackInputModel.value.trim()) elements.feedbackInputModel.value = draft.model;
   if (draft.userId && !elements.feedbackInputId.value.trim()) elements.feedbackInputId.value = draft.userId;
   if (draft.email && !elements.feedbackInputEmail.value.trim()) elements.feedbackInputEmail.value = draft.email;
-  if (draft.category && !elements.feedbackInputCategory.value.trim()) elements.feedbackInputCategory.value = draft.category;
+  if (draft.category && !elements.feedbackInputCategory.value.trim()) setFeedbackCategories(draft.category);
   if (draft.priority) elements.feedbackInputPriority.value = draft.priority;
   if (draft.requestNumber && !elements.feedbackInputRequest.value.trim()) elements.feedbackInputRequest.value = draft.requestNumber;
   if (draft.channel && !elements.feedbackInputChannel.value.trim()) elements.feedbackInputChannel.value = draft.channel;
@@ -1248,6 +1619,7 @@ function clearFeedbackInput() {
     return;
   }
   elements.feedbackInputForm.reset();
+  setFeedbackCategories("");
   elements.feedbackInputPriority.value = "P2";
   elements.feedbackInputStatus.value = "To Submit";
   setFeedbackInputMessage("");
@@ -1263,6 +1635,7 @@ function toggleFeedbackInput(open) {
   if (open && !elements.feedbackInputDate.value) {
     elements.feedbackInputDate.value = new Date().toISOString().slice(0, 10);
   }
+  syncFeedbackCategoryChoices();
 }
 
 async function saveFeedbackInput() {
@@ -1304,29 +1677,47 @@ async function saveFeedbackInput() {
 }
 
 function betaPayloadFromInput() {
+  const originalFeedback = elements.betaRawInput.value.trim();
+  const keyPoint = elements.betaInputKeyPoint.value.trim();
+  const testResults = elements.betaInputIssueFound.value.trim();
+  const featureRequests = elements.betaInputFeatureRequests.value.trim();
+  const communicationFollowUp = elements.betaInputNotes.value.trim();
+
+  const row = buildBetaCreateRow({
+    date: elements.betaInputDate.value.trim(),
+    productModel: elements.betaInputModel.value.trim(),
+    version: elements.betaInputVersion.value.trim(),
+    testItem: elements.betaInputTestItem.value.trim(),
+    testType: elements.betaInputTestType.value.trim(),
+    testerType: elements.betaInputTesterType.value.trim(),
+    testerOwner: elements.betaInputTesterOwner.value.trim(),
+    issueSource: "User Report",
+    keyPoint,
+    originalFeedback,
+    rawInput: originalFeedback,
+    testResults,
+    featureRequests,
+    communicationFollowUp,
+    severity: elements.betaInputSeverity.value.trim(),
+    priority: elements.betaInputPriority.value.trim(),
+    status: elements.betaInputStatus.value.trim(),
+    nextAction: elements.betaInputNextAction.value.trim(),
+    relatedFirmwareVersion: elements.betaInputVersion.value.trim(),
+  });
+
   return {
-    Date: elements.betaInputDate.value.trim(),
-    "Product Model": elements.betaInputModel.value.trim(),
-    Version: elements.betaInputVersion.value.trim(),
-    "Test Type": elements.betaInputTestType.value.trim(),
-    "Test Item": elements.betaInputTestItem.value.trim(),
-    "Tester Type": elements.betaInputTesterType.value.trim(),
-    "Tester / Owner": elements.betaInputTesterOwner.value.trim(),
-    "Issue Source": elements.betaInputTesterType.value.trim(),
-    "Issue Found": elements.betaInputIssueFound.value.trim(),
-    "Key Point": elements.betaInputKeyPoint.value.trim(),
-    Severity: elements.betaInputSeverity.value.trim(),
-    Priority: elements.betaInputPriority.value.trim(),
-    Status: elements.betaInputStatus.value.trim(),
-    "Assigned To": "",
-    "Engineering Response": "",
-    "Next Action": elements.betaInputNextAction.value.trim(),
-    "Target Date": "",
-    "Resolved Date": "",
-    "Related Request Number": "",
-    "Related Firmware Version": elements.betaInputVersion.value.trim(),
-    Notes: "",
-    "Raw Input": elements.betaRawInput.value.trim(),
+    ...row,
+    originalFeedback,
+    rawInput: originalFeedback,
+    keyPoint,
+    testResults,
+    featureRequests,
+    communicationFollowUp,
+    "Original Feedback": originalFeedback,
+    "Key Point": keyPoint,
+    "Test Results": testResults,
+    "Feature Requests": featureRequests,
+    "Communication Follow-up": communicationFollowUp,
   };
 }
 
@@ -1370,13 +1761,11 @@ function analyzeBetaInput() {
   if (!elements.betaInputTesterOwner.value.trim() && draft.testerOwner) {
     elements.betaInputTesterOwner.value = draft.testerOwner;
   }
-  elements.betaInputIssueFound.value = draft.issueFound;
-  elements.betaInputKeyPoint.value = draft.keyPoint;
   elements.betaInputSeverity.value = draft.severity;
   elements.betaInputPriority.value = draft.priority;
   elements.betaInputStatus.value = draft.status;
   elements.betaInputNextAction.value = draft.nextAction;
-  setBetaInputMessage("Draft generated. Review it, then save to Sheet.");
+  setBetaInputMessage("Draft generated. Original Feedback stays separate from Test Results.");
 }
 
 function clearBetaInput() {
@@ -1386,6 +1775,7 @@ function clearBetaInput() {
   }
   elements.betaInputForm.reset();
   elements.betaInputKeyPoint.value = "";
+  elements.betaInputFeatureRequests.value = "";
   elements.betaInputPriority.value = "P2";
   elements.betaInputSeverity.value = "Medium";
   elements.betaInputStatus.value = "Open";
@@ -1398,11 +1788,11 @@ async function saveBetaInput() {
     return;
   }
   if (!elements.betaRawInput.value.trim()) {
-    setBetaInputMessage("Raw Input is required.", true);
+    setBetaInputMessage("Original Feedback is required.", true);
     return;
   }
-  if (!elements.betaInputIssueFound.value.trim()) {
-    analyzeBetaInput();
+  if (!elements.betaInputDate.value) {
+    elements.betaInputDate.value = new Date().toISOString().slice(0, 10);
   }
   const record = betaPayloadFromInput();
   elements.betaSave.disabled = true;
@@ -1410,10 +1800,8 @@ async function saveBetaInput() {
   setBetaInputMessage("Saving beta test record...");
   try {
     await verifyEditPermission("beta");
-    const result = await syncBetaTestRecord(record);
-    state.betaRecords.unshift(normalizeBetaRow({ ...record, __rowNumber: result.row || "" }));
-    renderBetaFilterOptions();
-    renderBeta();
+    await syncBetaTestRecord(record);
+    await refreshBetaRecords({ silent: true });
     clearBetaInput();
     setBetaInputMessage("Saved to Beta Test Progress.");
   } catch (error) {
@@ -1461,6 +1849,11 @@ function applySavedChanges(record, changes, result = {}) {
     record.dashboardStatus = changes["Dashboard Status"];
     record.status = Object.entries(STATUS_LABELS).find(([, label]) => label === changes["Dashboard Status"])?.[0] || record.status;
   }
+  if (changes["Update Category"] !== undefined) {
+    record.updateCategory = changes["Update Category"];
+    record.categories = splitFeedbackCategories(changes["Update Category"]);
+    record.primaryCategory = record.categories[0] || "";
+  }
   if (changes.Priority !== undefined) record.priority = changes.Priority;
   if (changes.Notes !== undefined) record.notes = changes.Notes;
   if (changes["Request number"] !== undefined) record.requestNumber = changes["Request number"];
@@ -1486,7 +1879,7 @@ function permissionAwareDetailRow(label, value, fieldHtml, size = "medium") {
 function statusSelectTemplate(record) {
   return `
     <select name="Dashboard Status">
-      ${Object.entries(STATUS_LABELS)
+      ${FEEDBACK_STATUS_OPTIONS
         .map(
           ([status, label]) =>
             `<option value="${escapeHtml(label)}"${record.status === status ? " selected" : ""}>${escapeHtml(label)}</option>`,
@@ -1516,6 +1909,54 @@ function doneSelectTemplate(record) {
   `;
 }
 
+function categoryEditorTemplate(value, modifier = "") {
+  const selected = new Set(splitFeedbackCategories(value));
+  const modifierClass = modifier ? ` ${modifier}` : "";
+  return `
+    <div class="detail-category-editor${modifierClass}">
+      <input type="hidden" name="Update Category" value="${escapeHtml(splitFeedbackCategories(value).join(", "))}" />
+      <div class="feedback-category-options" aria-label="Update Category options">
+        ${FEEDBACK_CATEGORY_OPTIONS.map(
+          (category) => `
+            <button
+              class="category-choice ${categoryClass(category)}${selected.has(category) ? " is-selected" : ""}"
+              type="button"
+              data-detail-category="${escapeHtml(category)}"
+              aria-pressed="${selected.has(category) ? "true" : "false"}"
+            >${escapeHtml(category)}</button>
+          `,
+        ).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function bindDetailCategoryEditor() {
+  const editor = elements.detail.querySelector(".detail-category-editor");
+  if (!editor) return;
+  const input = editor.querySelector('input[name="Update Category"]');
+  const buttons = editor.querySelectorAll("[data-detail-category]");
+  editor.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-detail-category]");
+    if (!button || !input) return;
+    const selected = new Set(splitFeedbackCategories(input.value));
+    const category = button.dataset.detailCategory;
+    if (selected.has(category)) {
+      selected.delete(category);
+    } else {
+      selected.add(category);
+    }
+    const ordered = FEEDBACK_CATEGORY_OPTIONS.filter((option) => selected.has(option));
+    const extras = [...selected].filter((option) => !FEEDBACK_CATEGORY_OPTIONS.includes(option));
+    input.value = [...ordered, ...extras].join(", ");
+    buttons.forEach((choice) => {
+      const isSelected = splitFeedbackCategories(input.value).includes(choice.dataset.detailCategory);
+      choice.classList.toggle("is-selected", isSelected);
+      choice.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    });
+  });
+}
+
 function fieldValuesFromDetail() {
   const fields = elements.detail.querySelectorAll("[name]");
   return [...fields].reduce((values, field) => {
@@ -1527,6 +1968,7 @@ function fieldValuesFromDetail() {
 function originalEditableValues(record) {
   return {
     "Dashboard Status": STATUS_LABELS[record.status] || "",
+    "Update Category": record.updateCategory,
     Priority: record.priority,
     Notes: record.notes,
     "Request number": record.requestNumber,
@@ -1552,8 +1994,11 @@ const BETA_FIELD_TO_RECORD_KEY = {
   "Test Type": "testType",
   "Tester Type": "testerType",
   "Issue Source": "issueSource",
-  "Issue Found": "issueFound",
   "Key Point": "keyPoint",
+  "Original Feedback": "originalFeedback",
+  "Test Results": "testResults",
+  "Feature Requests": "featureRequests",
+  "Communication Follow-up": "communicationFollowUp",
   Severity: "severity",
   Priority: "priority",
   Status: "status",
@@ -1564,7 +2009,6 @@ const BETA_FIELD_TO_RECORD_KEY = {
   "Resolved Date": "resolvedDate",
   "Related Request Number": "relatedRequestNumber",
   "Related Firmware Version": "relatedFirmwareVersion",
-  Notes: "notes",
 };
 
 function betaOriginalEditableValues(record) {
@@ -1587,10 +2031,18 @@ function betaChangedFields(record) {
 }
 
 function applySavedBetaChanges(record, changes, result = {}) {
-  Object.entries(changes).forEach(([field, value]) => {
+  const savedChanges = result.changes && typeof result.changes === "object" ? result.changes : changes;
+  const savedRecord = result.record && typeof result.record === "object" ? normalizeBetaRow(result.record) : null;
+  Object.entries(savedChanges).forEach(([field, value]) => {
     const key = BETA_FIELD_TO_RECORD_KEY[field];
     if (key) record[key] = value;
   });
+  if (savedRecord) {
+    Object.assign(record, savedRecord);
+  }
+  if (Object.prototype.hasOwnProperty.call(savedChanges, "Original Feedback")) record.rawInput = record.originalFeedback;
+  if (Object.prototype.hasOwnProperty.call(savedChanges, "Test Results")) record.issueFound = record.testResults;
+  if (Object.prototype.hasOwnProperty.call(savedChanges, "Communication Follow-up")) record.notes = record.communicationFollowUp;
   if (result.editLog !== undefined) record.editLog = result.editLog;
 }
 
@@ -1633,7 +2085,7 @@ function feedbackForRequestNumber(requestNumber) {
   return state.records.filter((record) => normalizeRequestNumber(record.requestNumber) === key);
 }
 
-function requestMatchesTemplate(records) {
+function requestMatchesTemplate(records, options = {}) {
   return `
     <section class="request-match-picker">
       <h3>Matching Feedback</h3>
@@ -1642,7 +2094,7 @@ function requestMatchesTemplate(records) {
           (record, index) => `
             <button type="button" data-match-index="${index}">
               <strong>${escapeHtml(record.keyPoints || record.upgradeRequirements || "Feedback detail")}</strong>
-              <span>${escapeHtml([record.date, record.model, record.id].filter(Boolean).join(" · ") || "-")}</span>
+              <span>${escapeHtml([record.date, record.model, privateIdentityText(record.id, options)].filter(Boolean).join(" · ") || "-")}</span>
             </button>
           `,
         )
@@ -1651,7 +2103,8 @@ function requestMatchesTemplate(records) {
   `;
 }
 
-function openRequestMatches(records) {
+function openRequestMatches(records, options = {}) {
+  state.currentDetailRecord = null;
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
@@ -1663,16 +2116,15 @@ function openRequestMatches(records) {
         <button type="button" id="close-detail">Close</button>
       </div>
     </div>
-    ${requestMatchesTemplate(records)}
+    ${requestMatchesTemplate(records, options)}
   `;
   elements.detail.querySelectorAll("[data-match-index]").forEach((button) => {
     button.addEventListener("click", () => {
-      openDetail(records[Number(button.dataset.matchIndex)]);
+      openDetail(records[Number(button.dataset.matchIndex)], options);
     });
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
-    elements.detail.classList.add("is-hidden");
-    document.body.classList.remove("detail-open");
+    closeDetail();
   });
 }
 
@@ -1714,8 +2166,8 @@ function detailHeaderTagsTemplate(record) {
   `;
 }
 
-function detailSummaryTemplate(record) {
-  const meta = [record.requestNumber, record.date, record.id].filter(Boolean).join(" · ");
+function detailSummaryTemplate(record, options = {}) {
+  const meta = [record.requestNumber, record.date, privateIdentityText(record.id, options)].filter(Boolean).join(" · ");
   return `
     <section class="detail-summary-card">
       <div class="card-meta">
@@ -1728,7 +2180,9 @@ function detailSummaryTemplate(record) {
   `;
 }
 
-function openDetail(record) {
+function openDetail(record, options = { source: "feedback" }) {
+  const shouldHideIdentity = hideIdentityForDetail(options);
+  state.currentDetailRecord = record;
   document.body.classList.add("detail-open");
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
@@ -1739,11 +2193,12 @@ function openDetail(record) {
         <button type="button" id="close-detail">Close</button>
       </div>
     </div>
-    ${detailSummaryTemplate(record)}
+    ${detailSummaryTemplate(record, options)}
     <dl class="detail-list">
       ${linkedFirmwareTemplate(record)}
       ${detailRow("Original Feedback", record.upgradeRequirements)}
       ${detailRow("Chinese", record.chinese)}
+      ${permissionAwareDetailRow("Update Category", record.updateCategory, categoryEditorTemplate(record.updateCategory), "wide")}
       ${permissionAwareDetailRow("Status", STATUS_LABELS[record.status] || "-", statusSelectTemplate(record), "short")}
       ${permissionAwareDetailRow("Priority", record.priority, prioritySelectTemplate(record), "short")}
       ${permissionAwareDetailRow("Request number", record.requestNumber, `<input name="Request number" value="${escapeHtml(record.requestNumber)}" />`)}
@@ -1752,14 +2207,15 @@ function openDetail(record) {
       ${permissionAwareDetailRow("Notes", record.notes, `<textarea name="Notes" rows="4">${escapeHtml(record.notes)}</textarea>`, "wide")}
       ${modificationRowsTemplate(record)}
       ${detailRow("Model", record.model)}
-      ${detailRow("User ID", record.id)}
-      ${detailRow("Email", record.email)}
-      ${detailRow("Profile", record.profile)}
+      ${shouldHideIdentity ? "" : detailRow("User ID", record.id)}
+      ${shouldHideIdentity ? "" : detailRow("Email", record.email)}
+      ${shouldHideIdentity ? "" : detailRow("Profile", record.profile)}
       ${detailRow("Channel", record.channel)}
       ${detailRow("Date", record.date)}
     </dl>
     ${canEdit("feedback") ? `<button class="save-detail-changes" type="button">Save Changes</button>` : ""}
   `;
+  bindDetailCategoryEditor();
   document.querySelector(".copy-detail-summary").addEventListener("click", async () => {
     await copyEngineerSummary(record);
     showToast("Engineer summary copied");
@@ -1786,15 +2242,24 @@ function openDetail(record) {
     setDetailSaving(false);
   });
   document.querySelector("#close-detail").addEventListener("click", () => {
-    elements.detail.classList.add("is-hidden");
-    document.body.classList.remove("detail-open");
+    closeDetail();
   });
+}
+
+function closeDetail() {
+  elements.detail.classList.add("is-hidden");
+  document.body.classList.remove("detail-open");
+  state.currentDetailRecord = null;
+  state.currentBetaDetailRecord = null;
+}
+
+function isDetailOpenForRecord(record) {
+  return state.currentDetailRecord === record && !elements.detail.classList.contains("is-hidden");
 }
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || elements.detail.classList.contains("is-hidden")) return;
-  elements.detail.classList.add("is-hidden");
-  document.body.classList.remove("detail-open");
+  closeDetail();
 });
 
 function render() {
@@ -1952,7 +2417,11 @@ function validateFirmwareRows(rows) {
 function validateBetaRows(rows) {
   if (!rows.length) return [];
   const headers = rows.length ? Object.keys(rows[0]) : [];
-  return BETA_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
+  const missing = BETA_REQUIRED_HEADERS.filter((header) => !headers.includes(header));
+  BETA_CONTENT_HEADER_GROUPS.forEach((group) => {
+    if (!group.some((header) => headers.includes(header))) missing.push(group[0]);
+  });
+  return missing;
 }
 
 async function loadFirmwareRecords() {
@@ -1979,7 +2448,53 @@ async function loadBetaRecords() {
   }
   return rows
     .map(normalizeBetaRow)
-    .filter((record) => record.date || record.productModel || record.issueFound || record.rawInput);
+    .filter((record) => record.date || record.productModel || record.keyPoint || record.originalFeedback || record.testResults);
+}
+
+function betaRecordKey(record) {
+  return [
+    record?.rowNumber,
+    record?.date,
+    record?.productModel,
+    record?.version,
+    record?.testerOwner,
+    record?.keyPoint,
+    record?.originalFeedback,
+    record?.testResults,
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .join("|");
+}
+
+function findRefreshedBetaRecord(previousRecord) {
+  if (!previousRecord) return null;
+  if (previousRecord.rowNumber) {
+    const byRow = state.betaRecords.find((record) => record.rowNumber === previousRecord.rowNumber);
+    if (byRow) return byRow;
+  }
+  const previousKey = betaRecordKey(previousRecord);
+  return state.betaRecords.find((record) => betaRecordKey(record) === previousKey) || null;
+}
+
+async function refreshBetaRecords(options = {}) {
+  const { silent = false, keepDetailOpen = false } = options;
+  if (!canView("beta") || state.betaSyncInFlight) return;
+  state.betaSyncInFlight = true;
+  if (!silent) setBetaMessage("Syncing Beta Test Progress...");
+  const openRecord = keepDetailOpen ? state.currentBetaDetailRecord : null;
+  try {
+    state.betaRecords = await loadBetaRecords();
+    renderBetaFilterOptions();
+    renderBeta();
+    const refreshedOpenRecord = findRefreshedBetaRecord(openRecord);
+    if (refreshedOpenRecord && !elements.detail.classList.contains("is-hidden")) {
+      openBetaDetail(refreshedOpenRecord);
+    }
+  } catch (error) {
+    setBetaMessage(error instanceof Error ? error.message : "Beta Test Progress sync failed.", true);
+  } finally {
+    state.betaSyncInFlight = false;
+  }
 }
 
 async function load() {
@@ -2059,6 +2574,9 @@ function setActiveView(view) {
   elements.feedbackView.classList.toggle("is-hidden", view !== "feedback");
   elements.firmwareView.classList.toggle("is-hidden", view !== "firmware");
   elements.betaView.classList.toggle("is-hidden", view !== "beta");
+  if (view === "beta") {
+    refreshBetaRecords({ silent: true, keepDetailOpen: true });
+  }
 }
 
 elements.viewTabs.forEach((button) => {
@@ -2098,26 +2616,38 @@ elements.firmwareModel.addEventListener("change", () => {
 });
 elements.firmwareVersion.addEventListener("change", () => {
   state.firmwareFilters.version = elements.firmwareVersion.value;
+  updateFirmwareFilterSummary();
   renderFirmware();
 });
 elements.firmwareSearch.addEventListener("input", () => {
   state.firmwareFilters.search = elements.firmwareSearch.value;
+  updateFirmwareFilterSummary();
   renderFirmware();
 });
 elements.firmwareDateFrom.addEventListener("change", () => {
   state.firmwareFilters.dateFrom = elements.firmwareDateFrom.value;
+  updateFirmwareFilterSummary();
   renderFirmware();
 });
 elements.firmwareDateTo.addEventListener("change", () => {
   state.firmwareFilters.dateTo = elements.firmwareDateTo.value;
+  updateFirmwareFilterSummary();
   renderFirmware();
 });
 elements.firmwareRefresh.addEventListener("click", load);
+elements.firmwareFilterToggle.addEventListener("click", () => {
+  toggleModuleFilters("firmware", elements.firmwareFilterBar.classList.contains("is-collapsed"));
+});
 elements.feedbackAdd.addEventListener("click", () => {
   const isClosed = elements.feedbackInputPanel.classList.contains("is-hidden");
   toggleFeedbackInput(isClosed);
 });
 elements.feedbackClose.addEventListener("click", () => toggleFeedbackInput(false));
+elements.feedbackInputCategoryOptions?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-category]");
+  if (!button) return;
+  toggleFeedbackCategory(button.dataset.category);
+});
 elements.feedbackAnalyze.addEventListener("click", analyzeFeedbackInput);
 elements.feedbackClear.addEventListener("click", clearFeedbackInput);
 elements.feedbackInputForm.addEventListener("submit", async (event) => {
@@ -2131,33 +2661,43 @@ elements.betaModel.addEventListener("change", () => {
 });
 elements.betaVersion.addEventListener("change", () => {
   state.betaFilters.version = elements.betaVersion.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaTesterType.addEventListener("change", () => {
   state.betaFilters.testerType = elements.betaTesterType.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaStatus.addEventListener("change", () => {
   state.betaFilters.status = elements.betaStatus.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaPriority.addEventListener("change", () => {
   state.betaFilters.priority = elements.betaPriority.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaSearch.addEventListener("input", () => {
   state.betaFilters.search = elements.betaSearch.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaDateFrom.addEventListener("change", () => {
   state.betaFilters.dateFrom = elements.betaDateFrom.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
 elements.betaDateTo.addEventListener("change", () => {
   state.betaFilters.dateTo = elements.betaDateTo.value;
+  updateBetaFilterSummary();
   renderBeta();
 });
-elements.betaRefresh.addEventListener("click", load);
+elements.betaRefresh.addEventListener("click", () => refreshBetaRecords({ keepDetailOpen: true }));
+elements.betaFilterToggle.addEventListener("click", () => {
+  toggleModuleFilters("beta", elements.betaFilterBar.classList.contains("is-collapsed"));
+});
 elements.betaAnalyze.addEventListener("click", analyzeBetaInput);
 elements.betaClear.addEventListener("click", clearBetaInput);
 elements.betaInputForm.addEventListener("submit", async (event) => {
@@ -2165,6 +2705,13 @@ elements.betaInputForm.addEventListener("submit", async (event) => {
   await saveBetaInput();
 });
 elements.firmwareList.addEventListener("click", (event) => {
+  const titleButton = event.target.closest(".firmware-title-toggle");
+  if (titleButton) {
+    const details = titleButton.closest(".firmware-card")?.querySelector(".firmware-details");
+    if (details) details.open = !details.open;
+    return;
+  }
+
   const requestButton = event.target.closest(".closed-request-link");
   if (requestButton) {
     const matches = feedbackForRequestNumber(requestButton.dataset.requestNumber);
@@ -2173,10 +2720,10 @@ elements.firmwareList.addEventListener("click", (event) => {
       return;
     }
     if (matches.length === 1) {
-      openDetail(matches[0]);
+      openDetail(matches[0], { source: "firmware" });
       return;
     }
-    openRequestMatches(matches);
+    openRequestMatches(matches, { source: "firmware" });
     return;
   }
 
