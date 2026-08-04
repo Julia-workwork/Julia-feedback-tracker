@@ -149,7 +149,9 @@ const state = {
   betaRecords: [],
   firmwareLookup: new Map(),
   currentDetailRecord: null,
+  currentBetaDetailRecord: null,
   activeView: "feedback",
+  betaSyncInFlight: false,
   summaryFilter: "",
   filters: {
     model: "all",
@@ -1044,6 +1046,7 @@ async function copyText(text) {
 
 function openBetaDetail(record) {
   state.currentDetailRecord = null;
+  state.currentBetaDetailRecord = record;
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
     <div class="detail-panel__header">
@@ -1128,8 +1131,7 @@ function openBetaDetail(record) {
     try {
       const result = await syncBetaRecordChanges(record, changes);
       applySavedBetaChanges(record, changes, result);
-      renderBeta();
-      openBetaDetail(record);
+      await refreshBetaRecords({ silent: true, keepDetailOpen: true });
       showToast("Changes saved");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Update failed");
@@ -1798,10 +1800,8 @@ async function saveBetaInput() {
   setBetaInputMessage("Saving beta test record...");
   try {
     await verifyEditPermission("beta");
-    const result = await syncBetaTestRecord(record);
-    state.betaRecords.unshift(normalizeBetaRow({ ...record, __rowNumber: result.row || "" }));
-    renderBetaFilterOptions();
-    renderBeta();
+    await syncBetaTestRecord(record);
+    await refreshBetaRecords({ silent: true });
     clearBetaInput();
     setBetaInputMessage("Saved to Beta Test Progress.");
   } catch (error) {
@@ -2250,6 +2250,7 @@ function closeDetail() {
   elements.detail.classList.add("is-hidden");
   document.body.classList.remove("detail-open");
   state.currentDetailRecord = null;
+  state.currentBetaDetailRecord = null;
 }
 
 function isDetailOpenForRecord(record) {
@@ -2450,6 +2451,52 @@ async function loadBetaRecords() {
     .filter((record) => record.date || record.productModel || record.keyPoint || record.originalFeedback || record.testResults);
 }
 
+function betaRecordKey(record) {
+  return [
+    record?.rowNumber,
+    record?.date,
+    record?.productModel,
+    record?.version,
+    record?.testerOwner,
+    record?.keyPoint,
+    record?.originalFeedback,
+    record?.testResults,
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .join("|");
+}
+
+function findRefreshedBetaRecord(previousRecord) {
+  if (!previousRecord) return null;
+  if (previousRecord.rowNumber) {
+    const byRow = state.betaRecords.find((record) => record.rowNumber === previousRecord.rowNumber);
+    if (byRow) return byRow;
+  }
+  const previousKey = betaRecordKey(previousRecord);
+  return state.betaRecords.find((record) => betaRecordKey(record) === previousKey) || null;
+}
+
+async function refreshBetaRecords(options = {}) {
+  const { silent = false, keepDetailOpen = false } = options;
+  if (!canView("beta") || state.betaSyncInFlight) return;
+  state.betaSyncInFlight = true;
+  if (!silent) setBetaMessage("Syncing Beta Test Progress...");
+  const openRecord = keepDetailOpen ? state.currentBetaDetailRecord : null;
+  try {
+    state.betaRecords = await loadBetaRecords();
+    renderBetaFilterOptions();
+    renderBeta();
+    const refreshedOpenRecord = findRefreshedBetaRecord(openRecord);
+    if (refreshedOpenRecord && !elements.detail.classList.contains("is-hidden")) {
+      openBetaDetail(refreshedOpenRecord);
+    }
+  } catch (error) {
+    setBetaMessage(error instanceof Error ? error.message : "Beta Test Progress sync failed.", true);
+  } finally {
+    state.betaSyncInFlight = false;
+  }
+}
+
 async function load() {
   setMessage(canView("feedback") ? "Loading feedback data..." : "");
   setFirmwareMessage(canView("firmware") ? "Loading firmware data..." : "");
@@ -2527,6 +2574,9 @@ function setActiveView(view) {
   elements.feedbackView.classList.toggle("is-hidden", view !== "feedback");
   elements.firmwareView.classList.toggle("is-hidden", view !== "firmware");
   elements.betaView.classList.toggle("is-hidden", view !== "beta");
+  if (view === "beta") {
+    refreshBetaRecords({ silent: true, keepDetailOpen: true });
+  }
 }
 
 elements.viewTabs.forEach((button) => {
@@ -2644,7 +2694,7 @@ elements.betaDateTo.addEventListener("change", () => {
   updateBetaFilterSummary();
   renderBeta();
 });
-elements.betaRefresh.addEventListener("click", load);
+elements.betaRefresh.addEventListener("click", () => refreshBetaRecords({ keepDetailOpen: true }));
 elements.betaFilterToggle.addEventListener("click", () => {
   toggleModuleFilters("beta", elements.betaFilterBar.classList.contains("is-collapsed"));
 });
