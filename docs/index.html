@@ -340,12 +340,14 @@
               <label class="beta-field-status">
                 Status
                 <select id="beta-input-status">
-                  <option>Open</option>
-                  <option>Need Review</option>
-                  <option>Reproducing</option>
-                  <option>In Progress</option>
-                  <option>Resolved</option>
-                  <option>Closed</option>
+                  <option selected>To Test</option>
+                  <option>Testing</option>
+                  <option>Issue Found</option>
+                  <option>Engineer Checking</option>
+                  <option>Fixed</option>
+                  <option>Retest</option>
+                  <option>Passed</option>
+                  <option>Blocked</option>
                 </select>
               </label>
               <label class="beta-field-next-action">
@@ -400,12 +402,14 @@
             Status
             <select id="beta-status-filter">
               <option value="">All Statuses</option>
-              <option>Open</option>
-              <option>Need Review</option>
-              <option>Reproducing</option>
-              <option>In Progress</option>
-              <option>Resolved</option>
-              <option>Closed</option>
+              <option>To Test</option>
+              <option>Testing</option>
+              <option>Issue Found</option>
+              <option>Engineer Checking</option>
+              <option>Fixed</option>
+              <option>Retest</option>
+              <option>Passed</option>
+              <option>Blocked</option>
             </select>
           </label>
           <label>
@@ -444,6 +448,6 @@
     </main>
 
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Feedback details"></aside>
-    <script type="module" src="./app.js?v=20260804-beta-field-sync"></script>
+    <script type="module" src="./app.js?v=20260804-beta-status-sync"></script>
   </body>
 </html>

@@ -1,5 +1,6 @@
 import {
   BETA_TEST_HEADERS,
+  BETA_STATUS_OPTIONS,
   betaDetailHeading,
   betaDetailLabel,
   STATUS_LABELS,
@@ -14,6 +15,7 @@ import {
   canViewModule,
   normalizePermissions,
   normalizeBetaRow,
+  normalizeBetaStatus,
   normalizeFirmwareRow,
   normalizeRequestNumber,
   normalizeRow,
@@ -26,7 +28,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260804-beta-detail-sync";
+} from "./lib/domain.mjs?v=20260804-beta-status-sync";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -69,7 +71,6 @@ const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
 const BETA_TEST_TYPE_OPTIONS = ["Firmware", "APP", "CPS", "Hardware", "Accessory"];
 const BETA_TESTER_TYPE_OPTIONS = ["Internal Test", "User Beta Test", "Engineer Test", "KOC Test"];
 const BETA_ISSUE_SOURCE_OPTIONS = ["User Report", "Internal Found", "Regression", "Known Issue"];
-const BETA_STATUS_OPTIONS = ["Open", "Need Review", "Reproducing", "In Progress", "Resolved", "Closed"];
 const FEEDBACK_STATUS_OPTIONS = [
   ["todo", "To Submit"],
   ["submitted", "Submitted"],
@@ -103,7 +104,7 @@ function buildBetaCreateRow(fields = {}) {
     "Original Feedback": originalFeedback,
     Severity: cleanBetaField(fields.severity),
     Priority: cleanBetaField(fields.priority),
-    Status: cleanBetaField(fields.status),
+    Status: normalizeBetaStatus(fields.status) || "To Test",
     "Communication Follow-up": cleanBetaField(fields.communicationFollowUp),
     "Assigned To": cleanBetaField(fields.assignedTo),
     "Engineering Response": cleanBetaField(fields.engineeringResponse),
@@ -118,6 +119,7 @@ function buildBetaCreateRow(fields = {}) {
 
 function normalizeBetaSheetRecord(row = {}) {
   const record = normalizeBetaRow(row);
+  record.status = normalizeBetaStatus(record.status);
   record.originalFeedback = record.originalFeedback || cleanBetaField(row["Original Feedback"] || row["Raw Input"] || row["Input Area"]);
   record.testResults = record.testResults || cleanBetaField(row["Test Results"] || row["Issue Found"]);
   record.featureRequests = record.featureRequests || cleanBetaField(row["Feature Requests"]);
@@ -1784,7 +1786,7 @@ function analyzeBetaInput() {
   }
   elements.betaInputSeverity.value = draft.severity;
   elements.betaInputPriority.value = draft.priority;
-  elements.betaInputStatus.value = draft.status;
+  elements.betaInputStatus.value = normalizeBetaStatus(draft.status) || "To Test";
   elements.betaInputNextAction.value = draft.nextAction;
   setBetaInputMessage("Draft generated. Original Feedback stays separate from Test Results.");
 }
@@ -1799,7 +1801,7 @@ function clearBetaInput() {
   elements.betaInputFeatureRequests.value = "";
   elements.betaInputPriority.value = "P2";
   elements.betaInputSeverity.value = "Medium";
-  elements.betaInputStatus.value = "Open";
+  elements.betaInputStatus.value = "To Test";
   setBetaInputMessage("");
 }
 

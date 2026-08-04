@@ -107,6 +107,34 @@ export function clean(value) {
   return String(value ?? "").trim();
 }
 
+export const BETA_STATUS_OPTIONS = [
+  "To Test",
+  "Testing",
+  "Issue Found",
+  "Engineer Checking",
+  "Fixed",
+  "Retest",
+  "Passed",
+  "Blocked",
+];
+
+const BETA_STATUS_ALIASES = new Map([
+  ["open", "To Test"],
+  ["need review", "Engineer Checking"],
+  ["reproducing", "Testing"],
+  ["in progress", "Engineer Checking"],
+  ["resolved", "Fixed"],
+  ["closed", "Passed"],
+]);
+
+export function normalizeBetaStatus(value) {
+  const status = clean(value);
+  if (!status || status === "-") return "";
+  const exact = BETA_STATUS_OPTIONS.find((option) => option.toLowerCase() === status.toLowerCase());
+  if (exact) return exact;
+  return BETA_STATUS_ALIASES.get(status.toLowerCase()) || status;
+}
+
 export function buildBetaCreateRow(fields = {}) {
   const explicitOriginalFeedback = clean(fields.originalFeedback);
   const originalFeedback = explicitOriginalFeedback || clean(fields.rawInput);
@@ -126,7 +154,7 @@ export function buildBetaCreateRow(fields = {}) {
     "Original Feedback": originalFeedback,
     Severity: clean(fields.severity),
     Priority: clean(fields.priority),
-    Status: clean(fields.status),
+    Status: normalizeBetaStatus(fields.status) || "To Test",
     "Communication Follow-up": clean(fields.communicationFollowUp),
     "Assigned To": clean(fields.assignedTo),
     "Engineering Response": clean(fields.engineeringResponse),
@@ -256,7 +284,7 @@ export function normalizeBetaRow(row) {
     communicationFollowUp,
     severity: clean(row.Severity),
     priority: clean(row.Priority),
-    status: clean(row.Status),
+    status: normalizeBetaStatus(row.Status),
     assignedTo: clean(row["Assigned To"]),
     engineeringResponse: clean(row["Engineering Response"]),
     nextAction: clean(row["Next Action"]),
@@ -641,13 +669,13 @@ export function summarizeFirmware(releases) {
 }
 
 export function summarizeBetaTests(records) {
-  const openStatuses = new Set(["Open", "Need Review", "Reproducing", "In Progress"]);
-  const resolvedStatuses = new Set(["Resolved", "Closed", "Fixed"]);
+  const openStatuses = new Set(["To Test", "Testing", "Issue Found", "Engineer Checking", "Retest", "Blocked"]);
+  const resolvedStatuses = new Set(["Fixed", "Passed"]);
   const highSeverity = new Set(["Critical", "High"]);
   return {
     total: records.length,
     open: records.filter((record) => openStatuses.has(record.status)).length,
-    inProgress: records.filter((record) => record.status === "In Progress").length,
+    inProgress: records.filter((record) => ["Testing", "Issue Found", "Engineer Checking", "Retest"].includes(record.status)).length,
     resolved: records.filter((record) => resolvedStatuses.has(record.status)).length,
     highSeverity: records.filter((record) => highSeverity.has(record.severity)).length,
     userTestIssues: records.filter((record) => /user|beta|koc/i.test(record.testerType || record.issueSource)).length,
@@ -792,9 +820,9 @@ export function inferBetaDraft(input) {
   }
 
   const priority = severity === "Critical" ? "P0" : severity === "High" ? "P1" : "P2";
-  const status = lower.includes("fixed") || lower.includes("resolved") || /已修复|已解决/.test(rawInput) ? "Resolved" : "Open";
+  const status = lower.includes("fixed") || lower.includes("resolved") || /已修复|已解决/.test(rawInput) ? "Fixed" : "To Test";
   const nextAction =
-    status === "Resolved"
+    status === "Fixed"
       ? "Verify fix in the next test round."
       : "Reproduce the issue, confirm affected version, and assign engineering owner.";
 
