@@ -116,6 +116,23 @@ function buildBetaCreateRow(fields = {}) {
   };
 }
 
+function normalizeBetaSheetRecord(row = {}) {
+  const record = normalizeBetaRow(row);
+  record.originalFeedback = record.originalFeedback || cleanBetaField(row["Original Feedback"] || row["Raw Input"] || row["Input Area"]);
+  record.testResults = record.testResults || cleanBetaField(row["Test Results"] || row["Issue Found"]);
+  record.featureRequests = record.featureRequests || cleanBetaField(row["Feature Requests"]);
+  record.communicationFollowUp =
+    record.communicationFollowUp || cleanBetaField(row["Communication Follow-up"] || row["Process Follow-up"] || row.Notes);
+  record.rawInput = record.originalFeedback;
+  record.issueFound = record.testResults;
+  record.notes = record.communicationFollowUp;
+  return record;
+}
+
+function betaFieldValue(record, field, ...fallbacks) {
+  return [record?.[field], ...fallbacks].map(cleanBetaField).find(Boolean) || "";
+}
+
 const FEEDBACK_CATEGORY_OPTIONS = [
   "BUG",
   "Feature Request",
@@ -1047,6 +1064,10 @@ async function copyText(text) {
 function openBetaDetail(record) {
   state.currentDetailRecord = null;
   state.currentBetaDetailRecord = record;
+  const originalFeedback = betaFieldValue(record, "originalFeedback", record.rawInput, record.inputArea);
+  const testResults = betaFieldValue(record, "testResults", record.issueFound);
+  const featureRequests = betaFieldValue(record, "featureRequests");
+  const communicationFollowUp = betaFieldValue(record, "communicationFollowUp", record.notes, record.processFollowUp);
   elements.detail.classList.remove("is-hidden");
   elements.detail.innerHTML = `
     <div class="detail-panel__header">
@@ -1089,10 +1110,10 @@ function openBetaDetail(record) {
         betaSelectTemplate("Issue Source", record.issueSource, selectOptionsFromRecords(state.betaRecords, "issueSource", BETA_ISSUE_SOURCE_OPTIONS)),
       )}
       ${betaEditableRow(record, "Key Point", record.keyPoint, textareaTemplate("Key Point", record.keyPoint, 3), "wide")}
-      ${betaEditableRow(record, "Original Feedback", record.originalFeedback, textareaTemplate("Original Feedback", record.originalFeedback, 5), "wide")}
-      ${betaEditableRow(record, "Test Results", record.testResults, textareaTemplate("Test Results", record.testResults, 4), "wide")}
-      ${betaEditableRow(record, "Feature Requests", record.featureRequests, textareaTemplate("Feature Requests", record.featureRequests, 4), "wide")}
-      ${betaEditableRow(record, "Communication Follow-up", record.communicationFollowUp, textareaTemplate("Communication Follow-up", record.communicationFollowUp, 5), "wide")}
+      ${betaEditableRow(record, "Original Feedback", originalFeedback, textareaTemplate("Original Feedback", originalFeedback, 5), "wide")}
+      ${betaEditableRow(record, "Test Results", testResults, textareaTemplate("Test Results", testResults, 4), "wide")}
+      ${betaEditableRow(record, "Feature Requests", featureRequests, textareaTemplate("Feature Requests", featureRequests, 4), "wide")}
+      ${betaEditableRow(record, "Communication Follow-up", communicationFollowUp, textareaTemplate("Communication Follow-up", communicationFollowUp, 5), "wide")}
       ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, BETA_SEVERITY_OPTIONS), "short")}
       ${betaEditableRow(record, "Priority", record.priority, betaSelectTemplate("Priority", record.priority, BETA_PRIORITY_OPTIONS), "short")}
       ${betaEditableRow(
@@ -2447,7 +2468,7 @@ async function loadBetaRecords() {
     throw new Error(`Beta Test Progress is missing columns: ${missing.join(", ")}`);
   }
   return rows
-    .map(normalizeBetaRow)
+    .map(normalizeBetaSheetRecord)
     .filter((record) => record.date || record.productModel || record.keyPoint || record.originalFeedback || record.testResults);
 }
 
