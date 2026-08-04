@@ -26,7 +26,7 @@ import {
   uniqueBetaVersions,
   uniqueFirmwareModels,
   uniqueModels,
-} from "./lib/domain.mjs?v=20260730-login-import-guard";
+} from "./lib/domain.mjs?v=20260804-beta-detail-sync";
 
 const SHEET_ID = "1cVR8KAaFwuPyofT-byCk5gWwl5aL7FOsr6lgVV9w6IE";
 const FEEDBACK_SHEET_GID = "1702171693";
@@ -97,14 +97,14 @@ function buildBetaCreateRow(fields = {}) {
     "Tester Type": cleanBetaField(fields.testerType),
     "Tester / Owner": cleanBetaField(fields.testerOwner),
     "Issue Source": cleanBetaField(fields.issueSource) || "User Report",
-    "Key Point": cleanBetaField(fields.keyPoint),
-    "Original Feedback": originalFeedback,
     "Test Results": cleanBetaField(fields.testResults),
     "Feature Requests": cleanBetaField(fields.featureRequests),
-    "Communication Follow-up": cleanBetaField(fields.communicationFollowUp),
+    "Key Point": cleanBetaField(fields.keyPoint),
+    "Original Feedback": originalFeedback,
     Severity: cleanBetaField(fields.severity),
     Priority: cleanBetaField(fields.priority),
     Status: cleanBetaField(fields.status),
+    "Communication Follow-up": cleanBetaField(fields.communicationFollowUp),
     "Assigned To": cleanBetaField(fields.assignedTo),
     "Engineering Response": cleanBetaField(fields.engineeringResponse),
     "Next Action": cleanBetaField(fields.nextAction),
@@ -1676,8 +1676,12 @@ async function saveFeedbackInput() {
 
 function betaPayloadFromInput() {
   const originalFeedback = elements.betaRawInput.value.trim();
+  const keyPoint = elements.betaInputKeyPoint.value.trim();
+  const testResults = elements.betaInputIssueFound.value.trim();
+  const featureRequests = elements.betaInputFeatureRequests.value.trim();
+  const communicationFollowUp = elements.betaInputNotes.value.trim();
 
-  return buildBetaCreateRow({
+  const row = buildBetaCreateRow({
     date: elements.betaInputDate.value.trim(),
     productModel: elements.betaInputModel.value.trim(),
     version: elements.betaInputVersion.value.trim(),
@@ -1686,18 +1690,33 @@ function betaPayloadFromInput() {
     testerType: elements.betaInputTesterType.value.trim(),
     testerOwner: elements.betaInputTesterOwner.value.trim(),
     issueSource: "User Report",
-    keyPoint: elements.betaInputKeyPoint.value.trim(),
+    keyPoint,
     originalFeedback,
     rawInput: originalFeedback,
-    testResults: elements.betaInputIssueFound.value.trim(),
-    featureRequests: elements.betaInputFeatureRequests.value.trim(),
-    communicationFollowUp: elements.betaInputNotes.value.trim(),
+    testResults,
+    featureRequests,
+    communicationFollowUp,
     severity: elements.betaInputSeverity.value.trim(),
     priority: elements.betaInputPriority.value.trim(),
     status: elements.betaInputStatus.value.trim(),
     nextAction: elements.betaInputNextAction.value.trim(),
     relatedFirmwareVersion: elements.betaInputVersion.value.trim(),
   });
+
+  return {
+    ...row,
+    originalFeedback,
+    rawInput: originalFeedback,
+    keyPoint,
+    testResults,
+    featureRequests,
+    communicationFollowUp,
+    "Original Feedback": originalFeedback,
+    "Key Point": keyPoint,
+    "Test Results": testResults,
+    "Feature Requests": featureRequests,
+    "Communication Follow-up": communicationFollowUp,
+  };
 }
 
 function syncBetaTestRecord(record) {
@@ -2012,13 +2031,18 @@ function betaChangedFields(record) {
 }
 
 function applySavedBetaChanges(record, changes, result = {}) {
-  Object.entries(changes).forEach(([field, value]) => {
+  const savedChanges = result.changes && typeof result.changes === "object" ? result.changes : changes;
+  const savedRecord = result.record && typeof result.record === "object" ? normalizeBetaRow(result.record) : null;
+  Object.entries(savedChanges).forEach(([field, value]) => {
     const key = BETA_FIELD_TO_RECORD_KEY[field];
     if (key) record[key] = value;
   });
-  if (Object.prototype.hasOwnProperty.call(changes, "Original Feedback")) record.rawInput = record.originalFeedback;
-  if (Object.prototype.hasOwnProperty.call(changes, "Test Results")) record.issueFound = record.testResults;
-  if (Object.prototype.hasOwnProperty.call(changes, "Communication Follow-up")) record.notes = record.communicationFollowUp;
+  if (savedRecord) {
+    Object.assign(record, savedRecord);
+  }
+  if (Object.prototype.hasOwnProperty.call(savedChanges, "Original Feedback")) record.rawInput = record.originalFeedback;
+  if (Object.prototype.hasOwnProperty.call(savedChanges, "Test Results")) record.issueFound = record.testResults;
+  if (Object.prototype.hasOwnProperty.call(savedChanges, "Communication Follow-up")) record.notes = record.communicationFollowUp;
   if (result.editLog !== undefined) record.editLog = result.editLog;
 }
 
