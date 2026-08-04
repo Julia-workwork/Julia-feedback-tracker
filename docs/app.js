@@ -1,6 +1,5 @@
 import {
   BETA_TEST_HEADERS,
-  BETA_STATUS_OPTIONS,
   betaDetailHeading,
   betaDetailLabel,
   STATUS_LABELS,
@@ -15,7 +14,6 @@ import {
   canViewModule,
   normalizePermissions,
   normalizeBetaRow,
-  normalizeBetaStatus,
   normalizeFirmwareRow,
   normalizeRequestNumber,
   normalizeRow,
@@ -71,6 +69,15 @@ const AUTH_STORAGE_KEY = "juliaFeedbackAuth";
 const BETA_TEST_TYPE_OPTIONS = ["Firmware", "APP", "CPS", "Hardware", "Accessory"];
 const BETA_TESTER_TYPE_OPTIONS = ["Internal Test", "User Beta Test", "Engineer Test", "KOC Test"];
 const BETA_ISSUE_SOURCE_OPTIONS = ["User Report", "Internal Found", "Regression", "Known Issue"];
+const BETA_STATUS_OPTIONS = ["To Test", "Testing", "Issue Found", "Engineer Checking", "Fixed", "Retest", "Passed", "Blocked"];
+const BETA_STATUS_ALIASES = new Map([
+  ["open", "To Test"],
+  ["need review", "Engineer Checking"],
+  ["reproducing", "Testing"],
+  ["in progress", "Engineer Checking"],
+  ["resolved", "Fixed"],
+  ["closed", "Passed"],
+]);
 const FEEDBACK_STATUS_OPTIONS = [
   ["todo", "To Submit"],
   ["submitted", "Submitted"],
@@ -83,6 +90,14 @@ const BETA_PRIORITY_OPTIONS = ["P0", "P1", "P2"];
 
 function cleanBetaField(value) {
   return String(value ?? "").trim();
+}
+
+function normalizeBetaStatus(value) {
+  const status = cleanBetaField(value);
+  if (!status || status === "-") return "";
+  const exact = BETA_STATUS_OPTIONS.find((option) => option.toLowerCase() === status.toLowerCase());
+  if (exact) return exact;
+  return BETA_STATUS_ALIASES.get(status.toLowerCase()) || status;
 }
 
 function buildBetaCreateRow(fields = {}) {
