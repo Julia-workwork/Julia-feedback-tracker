@@ -13,6 +13,7 @@ export const STATUS_LABELS = {
   submitted: "Submitted",
   inProgress: "In Progress",
   resolved: "Resolved",
+  notAccepted: "Not Accepted",
 };
 
 export const STATUS_BY_LABEL = {
@@ -20,22 +21,78 @@ export const STATUS_BY_LABEL = {
   Submitted: "submitted",
   "In Progress": "inProgress",
   Resolved: "resolved",
+  "Not Accepted": "notAccepted",
 };
+
+export const DASHBOARD_MODULES = ["feedback", "firmware", "beta"];
+
+function normalizeModuleName(value) {
+  const module = clean(value).toLowerCase();
+  return DASHBOARD_MODULES.includes(module) ? module : "";
+}
+
+function normalizeModuleList(values) {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set();
+  const modules = [];
+  values.forEach((value) => {
+    const module = normalizeModuleName(value);
+    if (!module || seen.has(module)) return;
+    seen.add(module);
+    modules.push(module);
+  });
+  return modules;
+}
+
+export function normalizePermissions(auth) {
+  const role = clean(auth?.role || "Viewer");
+  const hasExplicitViews = Array.isArray(auth?.views);
+  const hasExplicitEdits = Array.isArray(auth?.edits);
+  const admin = role === "Admin";
+  const editor = role === "Editor";
+  const edits = admin
+    ? [...DASHBOARD_MODULES]
+    : editor
+      ? hasExplicitEdits
+        ? normalizeModuleList(auth.edits)
+        : [...DASHBOARD_MODULES]
+      : [];
+  const viewSet = new Set(admin || !hasExplicitViews ? DASHBOARD_MODULES : normalizeModuleList(auth.views));
+  edits.forEach((module) => viewSet.add(module));
+
+  return {
+    ...(auth || {}),
+    role,
+    edits,
+    views: DASHBOARD_MODULES.filter((module) => viewSet.has(module)),
+  };
+}
+
+export function canViewModule(auth, module) {
+  return normalizePermissions(auth).views.includes(normalizeModuleName(module));
+}
+
+export function canEditModule(auth, module) {
+  return normalizePermissions(auth).edits.includes(normalizeModuleName(module));
+}
 
 export const BETA_TEST_HEADERS = [
   "Date",
   "Product Model",
   "Version",
+  "Test Item",
   "Test Type",
   "Tester Type",
   "Tester / Owner",
   "Issue Source",
-  "Test Item",
-  "Issue Found",
+  "Test Results",
+  "Feature Requests",
   "Key Point",
+  "Original Feedback",
   "Severity",
   "Priority",
   "Status",
+  "Communication Follow-up",
   "Assigned To",
   "Engineering Response",
   "Next Action",
@@ -43,12 +100,43 @@ export const BETA_TEST_HEADERS = [
   "Resolved Date",
   "Related Request Number",
   "Related Firmware Version",
-  "Notes",
-  "Raw Input",
+  "Edit Log",
 ];
 
 export function clean(value) {
   return String(value ?? "").trim();
+}
+
+export function buildBetaCreateRow(fields = {}) {
+  const explicitOriginalFeedback = clean(fields.originalFeedback);
+  const originalFeedback = explicitOriginalFeedback || clean(fields.rawInput);
+
+  return {
+    Date: clean(fields.date),
+    "Product Model": clean(fields.productModel ?? fields.model),
+    Version: clean(fields.version),
+    "Test Item": clean(fields.testItem),
+    "Test Type": clean(fields.testType),
+    "Tester Type": clean(fields.testerType),
+    "Tester / Owner": clean(fields.testerOwner),
+    "Issue Source": clean(fields.issueSource) || "User Report",
+    "Test Results": clean(fields.testResults),
+    "Feature Requests": clean(fields.featureRequests),
+    "Key Point": clean(fields.keyPoint),
+    "Original Feedback": originalFeedback,
+    Severity: clean(fields.severity),
+    Priority: clean(fields.priority),
+    Status: clean(fields.status),
+    "Communication Follow-up": clean(fields.communicationFollowUp),
+    "Assigned To": clean(fields.assignedTo),
+    "Engineering Response": clean(fields.engineeringResponse),
+    "Next Action": clean(fields.nextAction),
+    "Target Date": clean(fields.targetDate),
+    "Resolved Date": clean(fields.resolvedDate),
+    "Related Request Number": clean(fields.relatedRequestNumber),
+    "Related Firmware Version": clean(fields.relatedFirmwareVersion ?? fields.version),
+    "Edit Log": clean(fields.editLog),
+  };
 }
 
 export function deriveStatus(row) {
@@ -131,21 +219,28 @@ export function parseClosedRequests(input) {
 
 export function normalizeFirmwareRow(row) {
   return {
-    date: clean(row.Date),
-    model: clean(row.Model),
-    hardwareVersion: clean(row["Hardware version"]),
-    version: clean(row["Firmware Version"] || row.Verion || row.Version),
-    versionStatus: clean(row["版本状态"]),
-    reasonForChange: clean(row["Reason for Change"]),
-    changeLog: clean(row["Change log"]),
-    chineseLog: clean(row["更新日志"]),
-    closedRequestsRaw: clean(row["关闭需求"]),
-    closedRequests: parseClosedRequests(row["关闭需求"]),
+    date: clean(row.Date || row.A || row[""]),
+    model: clean(row.Model || row.B),
+    hardwareVersion: clean(row["Hardware version"] || row.C),
+    version: clean(row["Firmware Version"] || row.Verion || row.Version || row.D),
+    versionStatus: clean(row["版本状态"] || row.E),
+    reasonForChange: clean(row["Reason for Change"] || row.F),
+    changeLog: clean(row["Change log"] || row.G),
+    chineseLog: clean(row["更新日志"] || row.H),
+    closedRequestsRaw: clean(row["关闭需求"] || row.I),
+    closedRequests: parseClosedRequests(row["关闭需求"] || row.I),
   };
 }
 
 export function normalizeBetaRow(row) {
+  const originalFeedback = clean(row["Original Feedback"] || row["Raw Input"] || row["Input Area"]);
+  const testResults = clean(row["Test Results"] || row["Issue Found"]);
+  const featureRequests = clean(row["Feature Requests"]);
+  const communicationFollowUp = clean(
+    row["Communication Follow-up"] || row["Process Follow-up"] || row.Notes,
+  );
   return {
+    rowNumber: clean(row.__rowNumber || row.rowNumber),
     date: clean(row.Date),
     productModel: clean(row["Product Model"]),
     version: clean(row.Version),
@@ -154,8 +249,11 @@ export function normalizeBetaRow(row) {
     testerOwner: clean(row["Tester / Owner"]),
     issueSource: clean(row["Issue Source"]),
     testItem: clean(row["Test Item"]),
-    issueFound: clean(row["Issue Found"]),
     keyPoint: clean(row["Key Point"]),
+    originalFeedback,
+    testResults,
+    featureRequests,
+    communicationFollowUp,
     severity: clean(row.Severity),
     priority: clean(row.Priority),
     status: clean(row.Status),
@@ -166,9 +264,28 @@ export function normalizeBetaRow(row) {
     resolvedDate: clean(row["Resolved Date"]),
     relatedRequestNumber: clean(row["Related Request Number"]),
     relatedFirmwareVersion: clean(row["Related Firmware Version"]),
-    notes: clean(row.Notes),
-    rawInput: clean(row["Raw Input"]),
+    editLog: clean(row["Edit Log"]),
+    // Legacy aliases keep older UI/API code and existing records readable during migration.
+    rawInput: originalFeedback,
+    issueFound: testResults,
+    notes: communicationFollowUp,
   };
+}
+
+export function betaDetailHeading(record) {
+  return [record.productModel, record.testItem, record.testerType]
+    .map(clean)
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function betaDetailLabel(header) {
+  if (header === "Raw Input" || header === "Input Area" || header === "Original Feedback") return "Original Feedback";
+  if (header === "Issue Found" || header === "Test Results") return "Test Results";
+  if (["Notes", "Process Follow-up", "Communication Follow-up"].includes(header)) {
+    return "Communication Follow-up";
+  }
+  return header;
 }
 
 export function isFirmwareReleaseLikeFeedbackRow(row) {
@@ -425,7 +542,11 @@ export function filterBetaTests(records, filters) {
       record.testerOwner,
       record.issueSource,
       record.testItem,
-      record.issueFound,
+      record.keyPoint,
+      record.originalFeedback,
+      record.testResults,
+      record.featureRequests,
+      record.communicationFollowUp,
       record.severity,
       record.priority,
       record.status,
@@ -434,8 +555,6 @@ export function filterBetaTests(records, filters) {
       record.nextAction,
       record.relatedRequestNumber,
       record.relatedFirmwareVersion,
-      record.notes,
-      record.rawInput,
     ]
       .join("\n")
       .toLowerCase();
@@ -460,6 +579,7 @@ export function summarizeFeedback(records) {
     submitted: 0,
     inProgress: 0,
     resolved: 0,
+    notAccepted: 0,
   };
   const categoryCounts = {
     BUG: 0,
@@ -472,7 +592,9 @@ export function summarizeFeedback(records) {
   };
 
   for (const record of records) {
-    statusCounts[record.status] += 1;
+    if (statusCounts[record.status] !== undefined) {
+      statusCounts[record.status] += 1;
+    }
     for (const category of record.categories) {
       categoryCounts[category] += 1;
     }
@@ -499,6 +621,7 @@ export function summaryPercentages(summary) {
     submitted: formatPercent(submitted, total),
     inProgress: formatPercent(summary.statusCounts?.inProgress || 0, total),
     resolved: formatPercent(summary.statusCounts?.resolved || 0, total),
+    notAccepted: formatPercent(summary.statusCounts?.notAccepted || 0, total),
     unresolvedBug: formatPercent(summary.unresolvedBugs || 0, submitted),
   };
 }
@@ -628,6 +751,12 @@ function parseInputLead(input) {
 function inferKeyPoint(issueFound) {
   const text = clean(issueFound);
   if (!text) return "";
+  if (/(frequent contacts|quick pre-?written messages|pre-?configured|broadcast|point to point|point-to-point)/i.test(text)) {
+    return "Frequent contacts and quick pre-written messages need recall, broadcast, and preconfigured recipient selection support.";
+  }
+  if (/(selected band|programmed aprs frequency|aprs frequency|ota patch|bt ver|bluetooth version)/i.test(text)) {
+    return "APRS/GNSS behavior needs validation against selected band, configured frequency, firmware, and Bluetooth versions.";
+  }
   if (/lost.*usps|usps.*lost|package.*lost|lost.*package/i.test(text)) {
     return "Package appears lost in USPS system and may arrive very late.";
   }
@@ -640,14 +769,19 @@ function inferKeyPoint(issueFound) {
   if (/(aprs|gnss|packet|位置|定位)/i.test(text)) {
     return "APRS/GNSS behavior needs validation against expected firmware settings.";
   }
-  return text.split(/\n+/).map((line) => clean(line)).find(Boolean) || "";
+  const reportedProblem = text.match(
+    /(?:cannot|can't|no way|no option|does not|doesn't|not working|fails?|unable|missing|wrong|error|无法|不能|没有|错误|异常)[^.!?。；;\n]{0,140}/i,
+  );
+  if (reportedProblem) {
+    return `Reported issue: ${clean(reportedProblem[0])}.`;
+  }
+  return "Beta test issue requires engineering review; confirm expected behavior, affected version, and reproduction steps.";
 }
 
 export function inferBetaDraft(input) {
   const rawInput = clean(input);
   const lower = rawInput.toLowerCase();
   const parsedInput = parseInputLead(rawInput);
-  const issueFound = parsedInput.issueFound;
   let severity = "Medium";
   if (/(crash|reboot|brick|cannot power|dead|freeze|卡死|死机|重启|无法开机|变砖)/i.test(rawInput)) {
     severity = "Critical";
@@ -665,8 +799,12 @@ export function inferBetaDraft(input) {
       : "Reproduce the issue, confirm affected version, and assign engineering owner.";
 
   return {
-    issueFound,
-    keyPoint: inferKeyPoint(issueFound),
+    originalFeedback: rawInput,
+    testResults: "",
+    featureRequests: "",
+    communicationFollowUp: "",
+    issueFound: "",
+    keyPoint: "",
     date: parsedInput.date,
     testerOwner: parsedInput.testerOwner,
     severity,
@@ -674,6 +812,7 @@ export function inferBetaDraft(input) {
     status,
     nextAction,
     rawInput,
+    notes: "",
   };
 }
 
