@@ -186,6 +186,7 @@ const state = {
   currentBetaDetailRecord: null,
   activeView: "feedback",
   betaSyncInFlight: false,
+  lastBetaFocusRefreshAt: 0,
   summaryFilter: "",
   filters: {
     model: "all",
@@ -1350,6 +1351,7 @@ function callGoogleAppsScript(params) {
     const script = document.createElement("script");
     const query = new URLSearchParams({
       callback: callbackName,
+      cacheBust: String(Date.now()),
       ...params,
     });
     const separator = GOOGLE_APPS_SCRIPT_URL.includes("?") ? "&" : "?";
@@ -2616,6 +2618,19 @@ function setActiveView(view) {
     refreshBetaRecords({ silent: true, keepDetailOpen: true });
   }
 }
+
+function refreshBetaWhenReturningToPage() {
+  if (document.visibilityState === "hidden") return;
+  if (state.activeView !== "beta" || !canView("beta")) return;
+  const now = Date.now();
+  if (now - state.lastBetaFocusRefreshAt < 1500) return;
+  state.lastBetaFocusRefreshAt = now;
+  refreshBetaRecords({ silent: true, keepDetailOpen: true });
+}
+
+window.addEventListener("focus", refreshBetaWhenReturningToPage);
+window.addEventListener("pageshow", refreshBetaWhenReturningToPage);
+document.addEventListener("visibilitychange", refreshBetaWhenReturningToPage);
 
 elements.viewTabs.forEach((button) => {
   button.addEventListener("click", () => {
