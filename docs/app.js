@@ -1340,24 +1340,39 @@ function betaRecordMatchPayload(record) {
   };
 }
 
-function callGoogleAppsScript(params) {
-  return new Promise((resolve, reject) => {
-    if (!GOOGLE_APPS_SCRIPT_URL) {
-      reject(new Error("Sync is not configured yet."));
-      return;
-    }
+function appsScriptUrl(params, callbackName) {
+  const query = new URLSearchParams({
+    callback: callbackName,
+    cacheBust: String(Date.now()),
+    ...params,
+  });
+  const separator = GOOGLE_APPS_SCRIPT_URL.includes("?") ? "&" : "?";
+  return `${GOOGLE_APPS_SCRIPT_URL}${separator}${query.toString()}`;
+}
 
-    const callbackName = `handleSheetSync_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+function parseAppsScriptPayload(text, callbackName) {
+  const source = String(text || "").trim();
+  const prefix = `${callbackName}(`;
+  if (source.startsWith(prefix) && source.endsWith(");")) {
+    return JSON.parse(source.slice(prefix.length, -2));
+  }
+  if (source.startsWith(prefix) && source.endsWith(")")) {
+    return JSON.parse(source.slice(prefix.length, -1));
+  }
+  return JSON.parse(source);
+}
+
+function callGoogleAppsScriptViaJsonp(params, callbackName) {
+  return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    const query = new URLSearchParams({
-      callback: callbackName,
-      cacheBust: String(Date.now()),
-      ...params,
-    });
-    const separator = GOOGLE_APPS_SCRIPT_URL.includes("?") ? "&" : "?";
-    script.src = `${GOOGLE_APPS_SCRIPT_URL}${separator}${query.toString()}`;
+    script.src = appsScriptUrl(params, callbackName);
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Unable to contact the edit service. Please check the Apps Script deployment or browser network access."));
+    }, 15000);
 
     const cleanup = () => {
+      window.clearTimeout(timeout);
       delete window[callbackName];
       script.remove();
     };
@@ -1369,11 +1384,34 @@ function callGoogleAppsScript(params) {
 
     script.addEventListener("error", () => {
       cleanup();
-      reject(new Error("Unable to contact the edit service."));
+      reject(new Error("Unable to contact the edit service. Please check the Apps Script deployment or browser network access."));
     });
 
     document.head.append(script);
   });
+}
+
+async function callGoogleAppsScript(params) {
+  if (!GOOGLE_APPS_SCRIPT_URL) {
+    throw new Error("Sync is not configured yet.");
+  }
+
+  const callbackName = `handleSheetSync_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  if (window.fetch) {
+    try {
+      const response = await fetch(appsScriptUrl(params, callbackName), {
+        cache: "no-store",
+        credentials: "omit",
+        redirect: "follow",
+      });
+      if (response.ok) {
+        return parseAppsScriptPayload(await response.text(), callbackName);
+      }
+    } catch (error) {
+      // Some browsers or extensions block Apps Script fetches while still allowing JSONP.
+    }
+  }
+  return callGoogleAppsScriptViaJsonp(params, callbackName);
 }
 
 async function verifyEditPermission(module = "feedback") {
