@@ -86,7 +86,7 @@ const FEEDBACK_STATUS_OPTIONS = [
   ["notAccepted", "Not Accepted"],
 ];
 const BETA_SEVERITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
-const BETA_PRIORITY_OPTIONS = ["P0", "P1", "P2"];
+const BETA_PRIORITY_OPTIONS = ["P0", "P1", "P2", "P3"];
 
 function cleanBetaField(value) {
   return String(value ?? "").trim();
@@ -1971,7 +1971,7 @@ function statusSelectTemplate(record) {
 function prioritySelectTemplate(record) {
   return `
     <select name="Priority">
-      ${["", "P0", "P1", "P2"]
+      ${["", "P0", "P1", "P2", "P3"]
         .map((priority) => `<option value="${priority}"${record.priority === priority ? " selected" : ""}>${priority || "-"}</option>`)
         .join("")}
     </select>
