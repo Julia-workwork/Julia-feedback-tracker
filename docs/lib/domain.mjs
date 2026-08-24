@@ -13,6 +13,7 @@ export const STATUS_LABELS = {
   submitted: "Submitted",
   inProgress: "In Progress",
   resolved: "Resolved",
+  notAccepted: "Not Accepted",
 };
 
 export const STATUS_BY_LABEL = {
@@ -20,6 +21,7 @@ export const STATUS_BY_LABEL = {
   Submitted: "submitted",
   "In Progress": "inProgress",
   Resolved: "resolved",
+  "Not Accepted": "notAccepted",
 };
 
 export const DASHBOARD_MODULES = ["feedback", "firmware", "beta"];
@@ -83,11 +85,14 @@ export const BETA_TEST_HEADERS = [
   "Tester Type",
   "Tester / Owner",
   "Issue Source",
-  "Issue Found",
+  "Test Results",
+  "Feature Requests",
   "Key Point",
+  "Original Feedback",
   "Severity",
   "Priority",
   "Status",
+  "Communication Follow-up",
   "Assigned To",
   "Engineering Response",
   "Next Action",
@@ -95,22 +100,96 @@ export const BETA_TEST_HEADERS = [
   "Resolved Date",
   "Related Request Number",
   "Related Firmware Version",
-  "Notes",
   "Edit Log",
-  "Raw Input",
 ];
 
 export function clean(value) {
   return String(value ?? "").trim();
 }
 
+export const BETA_STATUS_OPTIONS = [
+  "To Test",
+  "Testing",
+  "Issue Found",
+  "Engineer Checking",
+  "Fixed",
+  "Retest",
+  "Passed",
+  "Blocked",
+];
+
+const BETA_STATUS_ALIASES = new Map([
+  ["open", "To Test"],
+  ["need review", "Engineer Checking"],
+  ["reproducing", "Testing"],
+  ["in progress", "Engineer Checking"],
+  ["resolved", "Fixed"],
+  ["closed", "Passed"],
+]);
+
+export function normalizeBetaStatus(value) {
+  const status = clean(value);
+  if (!status || status === "-") return "";
+  const exact = BETA_STATUS_OPTIONS.find((option) => option.toLowerCase() === status.toLowerCase());
+  if (exact) return exact;
+  return BETA_STATUS_ALIASES.get(status.toLowerCase()) || status;
+}
+
+export function buildBetaCreateRow(fields = {}) {
+  const explicitOriginalFeedback = clean(fields.originalFeedback);
+  const originalFeedback = explicitOriginalFeedback || clean(fields.rawInput);
+
+  return {
+    Date: clean(fields.date),
+    "Product Model": clean(fields.productModel ?? fields.model),
+    Version: clean(fields.version),
+    "Test Item": clean(fields.testItem),
+    "Test Type": clean(fields.testType),
+    "Tester Type": clean(fields.testerType),
+    "Tester / Owner": clean(fields.testerOwner),
+    "Issue Source": clean(fields.issueSource) || "User Report",
+    "Test Results": clean(fields.testResults),
+    "Feature Requests": clean(fields.featureRequests),
+    "Key Point": clean(fields.keyPoint),
+    "Original Feedback": originalFeedback,
+    Severity: clean(fields.severity),
+    Priority: clean(fields.priority),
+    Status: normalizeBetaStatus(fields.status) || "To Test",
+    "Communication Follow-up": clean(fields.communicationFollowUp),
+    "Assigned To": clean(fields.assignedTo),
+    "Engineering Response": clean(fields.engineeringResponse),
+    "Next Action": clean(fields.nextAction),
+    "Target Date": clean(fields.targetDate),
+    "Resolved Date": clean(fields.resolvedDate),
+    "Related Request Number": clean(fields.relatedRequestNumber),
+    "Related Firmware Version": clean(fields.relatedFirmwareVersion ?? fields.version),
+    "Edit Log": clean(fields.editLog),
+  };
+}
+
 export function deriveStatus(row) {
   const dashboardStatus = STATUS_BY_LABEL[clean(row["Dashboard Status"])];
   if (dashboardStatus) return dashboardStatus;
+  const latestLoggedStatus = latestStatusFromChangeLog(row["Status Change Log"]);
+  if (latestLoggedStatus) return latestLoggedStatus;
   if (clean(row.DONE).toLowerCase() === "yes") return "resolved";
   if (clean(row.ING)) return "inProgress";
   if (clean(row["Request number"])) return "submitted";
   return "todo";
+}
+
+function latestStatusFromChangeLog(input) {
+  const lines = clean(input)
+    .split(/\n+/)
+    .map((line) => clean(line))
+    .filter(Boolean)
+    .reverse();
+  for (const line of lines) {
+    const match = line.match(/(?:->|→)\s*([^→>-]+)\s*$/);
+    const status = STATUS_BY_LABEL[clean(match?.[1])];
+    if (status) return status;
+  }
+  return "";
 }
 
 export function parseCategories(input) {
@@ -198,6 +277,12 @@ export function normalizeFirmwareRow(row) {
 }
 
 export function normalizeBetaRow(row) {
+  const originalFeedback = clean(row["Original Feedback"] || row["Raw Input"] || row["Input Area"]);
+  const testResults = clean(row["Test Results"] || row["Issue Found"]);
+  const featureRequests = clean(row["Feature Requests"]);
+  const communicationFollowUp = clean(
+    row["Communication Follow-up"] || row["Process Follow-up"] || row.Notes,
+  );
   return {
     rowNumber: clean(row.__rowNumber || row.rowNumber),
     date: clean(row.Date),
@@ -208,11 +293,14 @@ export function normalizeBetaRow(row) {
     testerOwner: clean(row["Tester / Owner"]),
     issueSource: clean(row["Issue Source"]),
     testItem: clean(row["Test Item"]),
-    issueFound: clean(row["Issue Found"]),
     keyPoint: clean(row["Key Point"]),
+    originalFeedback,
+    testResults,
+    featureRequests,
+    communicationFollowUp,
     severity: clean(row.Severity),
     priority: clean(row.Priority),
-    status: clean(row.Status),
+    status: normalizeBetaStatus(row.Status),
     assignedTo: clean(row["Assigned To"]),
     engineeringResponse: clean(row["Engineering Response"]),
     nextAction: clean(row["Next Action"]),
@@ -220,9 +308,11 @@ export function normalizeBetaRow(row) {
     resolvedDate: clean(row["Resolved Date"]),
     relatedRequestNumber: clean(row["Related Request Number"]),
     relatedFirmwareVersion: clean(row["Related Firmware Version"]),
-    notes: clean(row.Notes),
     editLog: clean(row["Edit Log"]),
-    rawInput: clean(row["Raw Input"]),
+    // Legacy aliases keep older UI/API code and existing records readable during migration.
+    rawInput: originalFeedback,
+    issueFound: testResults,
+    notes: communicationFollowUp,
   };
 }
 
@@ -234,7 +324,12 @@ export function betaDetailHeading(record) {
 }
 
 export function betaDetailLabel(header) {
-  return header === "Notes" ? "Process Follow-up" : header;
+  if (header === "Raw Input" || header === "Input Area" || header === "Original Feedback") return "Original Feedback";
+  if (header === "Issue Found" || header === "Test Results") return "Test Results";
+  if (["Notes", "Process Follow-up", "Communication Follow-up"].includes(header)) {
+    return "Communication Follow-up";
+  }
+  return header;
 }
 
 export function isFirmwareReleaseLikeFeedbackRow(row) {
@@ -491,7 +586,11 @@ export function filterBetaTests(records, filters) {
       record.testerOwner,
       record.issueSource,
       record.testItem,
-      record.issueFound,
+      record.keyPoint,
+      record.originalFeedback,
+      record.testResults,
+      record.featureRequests,
+      record.communicationFollowUp,
       record.severity,
       record.priority,
       record.status,
@@ -500,8 +599,6 @@ export function filterBetaTests(records, filters) {
       record.nextAction,
       record.relatedRequestNumber,
       record.relatedFirmwareVersion,
-      record.notes,
-      record.rawInput,
     ]
       .join("\n")
       .toLowerCase();
@@ -526,6 +623,7 @@ export function summarizeFeedback(records) {
     submitted: 0,
     inProgress: 0,
     resolved: 0,
+    notAccepted: 0,
   };
   const categoryCounts = {
     BUG: 0,
@@ -538,7 +636,9 @@ export function summarizeFeedback(records) {
   };
 
   for (const record of records) {
-    statusCounts[record.status] += 1;
+    if (statusCounts[record.status] !== undefined) {
+      statusCounts[record.status] += 1;
+    }
     for (const category of record.categories) {
       categoryCounts[category] += 1;
     }
@@ -565,6 +665,7 @@ export function summaryPercentages(summary) {
     submitted: formatPercent(submitted, total),
     inProgress: formatPercent(summary.statusCounts?.inProgress || 0, total),
     resolved: formatPercent(summary.statusCounts?.resolved || 0, total),
+    notAccepted: formatPercent(summary.statusCounts?.notAccepted || 0, total),
     unresolvedBug: formatPercent(summary.unresolvedBugs || 0, submitted),
   };
 }
@@ -584,13 +685,13 @@ export function summarizeFirmware(releases) {
 }
 
 export function summarizeBetaTests(records) {
-  const openStatuses = new Set(["Open", "Need Review", "Reproducing", "In Progress"]);
-  const resolvedStatuses = new Set(["Resolved", "Closed", "Fixed"]);
+  const openStatuses = new Set(["To Test", "Testing", "Issue Found", "Engineer Checking", "Retest", "Blocked"]);
+  const resolvedStatuses = new Set(["Fixed", "Passed"]);
   const highSeverity = new Set(["Critical", "High"]);
   return {
     total: records.length,
     open: records.filter((record) => openStatuses.has(record.status)).length,
-    inProgress: records.filter((record) => record.status === "In Progress").length,
+    inProgress: records.filter((record) => ["Testing", "Issue Found", "Engineer Checking", "Retest"].includes(record.status)).length,
     resolved: records.filter((record) => resolvedStatuses.has(record.status)).length,
     highSeverity: records.filter((record) => highSeverity.has(record.severity)).length,
     userTestIssues: records.filter((record) => /user|beta|koc/i.test(record.testerType || record.issueSource)).length,
@@ -694,6 +795,12 @@ function parseInputLead(input) {
 function inferKeyPoint(issueFound) {
   const text = clean(issueFound);
   if (!text) return "";
+  if (/(frequent contacts|quick pre-?written messages|pre-?configured|broadcast|point to point|point-to-point)/i.test(text)) {
+    return "Frequent contacts and quick pre-written messages need recall, broadcast, and preconfigured recipient selection support.";
+  }
+  if (/(selected band|programmed aprs frequency|aprs frequency|ota patch|bt ver|bluetooth version)/i.test(text)) {
+    return "APRS/GNSS behavior needs validation against selected band, configured frequency, firmware, and Bluetooth versions.";
+  }
   if (/lost.*usps|usps.*lost|package.*lost|lost.*package/i.test(text)) {
     return "Package appears lost in USPS system and may arrive very late.";
   }
@@ -706,14 +813,19 @@ function inferKeyPoint(issueFound) {
   if (/(aprs|gnss|packet|位置|定位)/i.test(text)) {
     return "APRS/GNSS behavior needs validation against expected firmware settings.";
   }
-  return text.split(/\n+/).map((line) => clean(line)).find(Boolean) || "";
+  const reportedProblem = text.match(
+    /(?:cannot|can't|no way|no option|does not|doesn't|not working|fails?|unable|missing|wrong|error|无法|不能|没有|错误|异常)[^.!?。；;\n]{0,140}/i,
+  );
+  if (reportedProblem) {
+    return `Reported issue: ${clean(reportedProblem[0])}.`;
+  }
+  return "Beta test issue requires engineering review; confirm expected behavior, affected version, and reproduction steps.";
 }
 
 export function inferBetaDraft(input) {
   const rawInput = clean(input);
   const lower = rawInput.toLowerCase();
   const parsedInput = parseInputLead(rawInput);
-  const issueFound = parsedInput.issueFound;
   let severity = "Medium";
   if (/(crash|reboot|brick|cannot power|dead|freeze|卡死|死机|重启|无法开机|变砖)/i.test(rawInput)) {
     severity = "Critical";
@@ -724,15 +836,19 @@ export function inferBetaDraft(input) {
   }
 
   const priority = severity === "Critical" ? "P0" : severity === "High" ? "P1" : "P2";
-  const status = lower.includes("fixed") || lower.includes("resolved") || /已修复|已解决/.test(rawInput) ? "Resolved" : "Open";
+  const status = lower.includes("fixed") || lower.includes("resolved") || /已修复|已解决/.test(rawInput) ? "Fixed" : "To Test";
   const nextAction =
-    status === "Resolved"
+    status === "Fixed"
       ? "Verify fix in the next test round."
       : "Reproduce the issue, confirm affected version, and assign engineering owner.";
 
   return {
-    issueFound,
-    keyPoint: inferKeyPoint(issueFound),
+    originalFeedback: rawInput,
+    testResults: "",
+    featureRequests: "",
+    communicationFollowUp: "",
+    issueFound: "",
+    keyPoint: "",
     date: parsedInput.date,
     testerOwner: parsedInput.testerOwner,
     severity,
@@ -740,6 +856,7 @@ export function inferBetaDraft(input) {
     status,
     nextAction,
     rawInput,
+    notes: "",
   };
 }
 
