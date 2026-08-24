@@ -1923,20 +1923,21 @@ function setDetailSaving(isSaving) {
 }
 
 function applySavedChanges(record, changes, result = {}) {
-  if (changes["Dashboard Status"] !== undefined) {
-    record.dashboardStatus = changes["Dashboard Status"];
-    record.status = Object.entries(STATUS_LABELS).find(([, label]) => label === changes["Dashboard Status"])?.[0] || record.status;
+  const savedChanges = result.changes && typeof result.changes === "object" ? result.changes : changes;
+  if (savedChanges["Dashboard Status"] !== undefined) {
+    record.dashboardStatus = savedChanges["Dashboard Status"];
+    record.status = Object.entries(STATUS_LABELS).find(([, label]) => label === savedChanges["Dashboard Status"])?.[0] || record.status;
   }
-  if (changes["Update Category"] !== undefined) {
-    record.updateCategory = changes["Update Category"];
-    record.categories = splitFeedbackCategories(changes["Update Category"]);
+  if (savedChanges["Update Category"] !== undefined) {
+    record.updateCategory = savedChanges["Update Category"];
+    record.categories = splitFeedbackCategories(savedChanges["Update Category"]);
     record.primaryCategory = record.categories[0] || "";
   }
-  if (changes.Priority !== undefined) record.priority = changes.Priority;
-  if (changes.Notes !== undefined) record.notes = changes.Notes;
-  if (changes["Request number"] !== undefined) record.requestNumber = changes["Request number"];
-  if (changes.ING !== undefined) record.ing = changes.ING;
-  if (changes.DONE !== undefined) record.done = changes.DONE;
+  if (savedChanges.Priority !== undefined) record.priority = savedChanges.Priority;
+  if (savedChanges.Notes !== undefined) record.notes = savedChanges.Notes;
+  if (savedChanges["Request number"] !== undefined) record.requestNumber = savedChanges["Request number"];
+  if (savedChanges.ING !== undefined) record.ing = savedChanges.ING;
+  if (savedChanges.DONE !== undefined) record.done = savedChanges.DONE;
   if (result.lastModifiedAt) record.lastModifiedAt = result.lastModifiedAt;
   if (result.lastModifiedBy) record.lastModifiedBy = result.lastModifiedBy;
   if (result.statusChangeLog !== undefined) record.statusChangeLog = result.statusChangeLog;
