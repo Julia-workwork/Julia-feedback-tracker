@@ -2058,11 +2058,11 @@ function originalEditableValues(record) {
 
 function changedFields(record) {
   const current = fieldValuesFromDetail();
-  if (current["Dashboard Status"] === "Not Accepted") {
+  const original = originalEditableValues(record);
+  if (current["Dashboard Status"] === "Not Accepted" && original["Dashboard Status"] !== "Not Accepted") {
     current.DONE = "No";
     current.ING = "";
   }
-  const original = originalEditableValues(record);
   return Object.entries(current).reduce((changes, [field, value]) => {
     if ((original[field] || "") !== value) {
       changes[field] = value;
