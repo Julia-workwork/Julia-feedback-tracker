@@ -2345,6 +2345,13 @@ document.addEventListener("keydown", (event) => {
   closeDetail();
 });
 
+document.addEventListener("click", (event) => {
+  if (elements.detail.classList.contains("is-hidden")) return;
+  if (elements.detail.contains(event.target)) return;
+  if (event.target.closest(".feedback-card, .beta-card, .request-match-picker")) return;
+  closeDetail();
+});
+
 function render() {
   const filtered = filterFeedback(state.records, state.filters);
   const visibleRecords = applySummaryFilter(filtered);
