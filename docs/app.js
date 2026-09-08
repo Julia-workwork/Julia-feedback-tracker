@@ -1350,6 +1350,24 @@ function appsScriptUrl(params, callbackName) {
   return `${GOOGLE_APPS_SCRIPT_URL}${separator}${query.toString()}`;
 }
 
+function appsScriptParams(params, callbackName) {
+  return new URLSearchParams({
+    callback: callbackName,
+    cacheBust: String(Date.now()),
+    ...params,
+  });
+}
+
+function shouldPostAppsScriptRequest(params) {
+  return [
+    "addFeedbackRecord",
+    "updateFeedbackFields",
+    "addBetaTestRecord",
+    "updateBetaTestRecord",
+    "updateFirmwareClosedRequests",
+  ].includes(params?.action);
+}
+
 function parseAppsScriptPayload(text, callbackName) {
   const source = String(text || "").trim();
   const prefix = `${callbackName}(`;
@@ -1399,7 +1417,10 @@ async function callGoogleAppsScript(params) {
   const callbackName = `handleSheetSync_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   if (window.fetch) {
     try {
-      const response = await fetch(appsScriptUrl(params, callbackName), {
+      const usePost = shouldPostAppsScriptRequest(params);
+      const response = await fetch(usePost ? GOOGLE_APPS_SCRIPT_URL : appsScriptUrl(params, callbackName), {
+        method: usePost ? "POST" : "GET",
+        body: usePost ? appsScriptParams(params, callbackName) : undefined,
         cache: "no-store",
         credentials: "omit",
         redirect: "follow",
