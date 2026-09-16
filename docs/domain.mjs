@@ -85,6 +85,7 @@ export const BETA_TEST_HEADERS = [
   "Tester Type",
   "Tester / Owner",
   "Issue Source",
+  "Communication Follow-up",
   "Test Results",
   "Feature Requests",
   "Key Point",
@@ -92,7 +93,6 @@ export const BETA_TEST_HEADERS = [
   "Severity",
   "Priority",
   "Status",
-  "Communication Follow-up",
   "Assigned To",
   "Engineering Response",
   "Next Action",
@@ -170,10 +170,26 @@ export function buildBetaCreateRow(fields = {}) {
 export function deriveStatus(row) {
   const dashboardStatus = STATUS_BY_LABEL[clean(row["Dashboard Status"])];
   if (dashboardStatus) return dashboardStatus;
+  const latestLoggedStatus = latestStatusFromChangeLog(row["Status Change Log"]);
+  if (latestLoggedStatus) return latestLoggedStatus;
   if (clean(row.DONE).toLowerCase() === "yes") return "resolved";
   if (clean(row.ING)) return "inProgress";
   if (clean(row["Request number"])) return "submitted";
   return "todo";
+}
+
+function latestStatusFromChangeLog(input) {
+  const lines = clean(input)
+    .split(/\n+/)
+    .map((line) => clean(line))
+    .filter(Boolean)
+    .reverse();
+  for (const line of lines) {
+    const match = line.match(/(?:->|→)\s*([^→>-]+)\s*$/);
+    const status = STATUS_BY_LABEL[clean(match?.[1])];
+    if (status) return status;
+  }
+  return "";
 }
 
 export function parseCategories(input) {

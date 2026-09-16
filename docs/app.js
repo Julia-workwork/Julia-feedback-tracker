@@ -974,11 +974,11 @@ const BETA_EDIT_LOG_FIELDS = [
   "Test Type",
   "Tester Type",
   "Issue Source",
+  "Communication Follow-up",
   "Key Point",
   "Original Feedback",
   "Test Results",
   "Feature Requests",
-  "Communication Follow-up",
   "Severity",
   "Priority",
   "Status",
@@ -1039,11 +1039,11 @@ function betaFullDetail(record) {
     `Test Type: ${record.testType || "-"}`,
     `Tester Type: ${record.testerType || "-"}`,
     `Issue Source: ${record.issueSource || "-"}`,
+    `Communication Follow-up: ${record.communicationFollowUp || "-"}`,
     `Key Point: ${record.keyPoint || "-"}`,
     `Original Feedback: ${record.originalFeedback || "-"}`,
     `Test Results: ${record.testResults || "-"}`,
     `Feature Requests: ${record.featureRequests || "-"}`,
-    `Communication Follow-up: ${record.communicationFollowUp || "-"}`,
     `Severity: ${record.severity || "-"}`,
     `Priority: ${record.priority || "-"}`,
     `Status: ${record.status || "-"}`,
@@ -1129,9 +1129,9 @@ function openBetaDetail(record) {
       )}
       ${betaEditableRow(record, "Key Point", record.keyPoint, textareaTemplate("Key Point", record.keyPoint, 3), "wide")}
       ${betaEditableRow(record, "Original Feedback", originalFeedback, textareaTemplate("Original Feedback", originalFeedback, 5), "wide")}
+      ${betaEditableRow(record, "Communication Follow-up", communicationFollowUp, textareaTemplate("Communication Follow-up", communicationFollowUp, 5), "wide")}
       ${betaEditableRow(record, "Test Results", testResults, textareaTemplate("Test Results", testResults, 4), "wide")}
       ${betaEditableRow(record, "Feature Requests", featureRequests, textareaTemplate("Feature Requests", featureRequests, 4), "wide")}
-      ${betaEditableRow(record, "Communication Follow-up", communicationFollowUp, textareaTemplate("Communication Follow-up", communicationFollowUp, 5), "wide")}
       ${betaEditableRow(record, "Severity", record.severity, betaSelectTemplate("Severity", record.severity, BETA_SEVERITY_OPTIONS), "short")}
       ${betaEditableRow(record, "Priority", record.priority, betaSelectTemplate("Priority", record.priority, BETA_PRIORITY_OPTIONS), "short")}
       ${betaEditableRow(
