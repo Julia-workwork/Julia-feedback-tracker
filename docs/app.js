@@ -1183,6 +1183,27 @@ function openBetaDetail(record) {
   });
 }
 
+async function openFreshBetaDetail(record) {
+  if (!record) return;
+  if (!canView("beta") || state.betaSyncInFlight) {
+    openBetaDetail(record);
+    return;
+  }
+
+  state.betaSyncInFlight = true;
+  try {
+    state.betaRecords = await loadBetaRecords();
+    renderBetaFilterOptions();
+    renderBeta();
+    openBetaDetail(findRefreshedBetaRecord(record) || record);
+  } catch (error) {
+    setBetaMessage(error instanceof Error ? error.message : "Beta Test Progress sync failed.", true);
+    openBetaDetail(record);
+  } finally {
+    state.betaSyncInFlight = false;
+  }
+}
+
 function renderBeta() {
   const visible = filterBetaTests(state.betaRecords, state.betaFilters).sort((a, b) =>
     dateSortValue(b.date) - dateSortValue(a.date) || String(b.date).localeCompare(String(a.date)),
@@ -1200,11 +1221,11 @@ function renderBeta() {
     : "";
 
   elements.betaList.querySelectorAll(".beta-card").forEach((card) => {
-    card.addEventListener("click", () => openBetaDetail(state.betaRecords[Number(card.dataset.betaIndex)]));
+    card.addEventListener("click", () => openFreshBetaDetail(state.betaRecords[Number(card.dataset.betaIndex)]));
     card.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      openBetaDetail(state.betaRecords[Number(card.dataset.betaIndex)]);
+      openFreshBetaDetail(state.betaRecords[Number(card.dataset.betaIndex)]);
     });
   });
 }
