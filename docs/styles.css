@@ -2044,8 +2044,8 @@ body {
 
 .beta-card {
   display: grid;
-  grid-template-columns: minmax(112px, 0.42fr) minmax(280px, 1.35fr) minmax(220px, 0.9fr) minmax(220px, 0.8fr) minmax(280px, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(120px, 0.42fr) minmax(460px, 1.9fr) minmax(190px, 0.72fr) minmax(150px, 0.5fr) minmax(300px, 1fr);
+  gap: 18px;
   align-items: center;
   border: 1px solid #d7dee8;
   border-radius: 14px;
@@ -2077,8 +2077,12 @@ body {
 .beta-card h3 {
   margin: 5px 0 0;
   color: #11161d;
-  font-size: 1rem;
-  line-height: 1.25;
+  font-size: clamp(1rem, 0.9vw, 1.12rem);
+  line-height: 1.32;
+}
+
+.beta-card-main {
+  max-width: 780px;
 }
 
 .beta-card-date {
