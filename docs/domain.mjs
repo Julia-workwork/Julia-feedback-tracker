@@ -374,7 +374,7 @@ function normalizedModel(value) {
   return clean(value).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-const KNOWN_MODELS = ["EZTALK65", "RA89R", "HA1UV", "HA1G", "HA2", "HD1", "HD2", "MA1", "M17", "H1", "A3"];
+const KNOWN_MODELS = ["EZTALK65", "RA89R", "HA1UV", "HA1G", "HA2", "HD1", "HD2", "HD2 V3", "MA1", "M17", "H1", "A3"];
 const NON_MODEL_WORDS = new Set([
   "APP",
   "CPS",
@@ -391,7 +391,7 @@ const NON_MODEL_WORDS = new Set([
 ]);
 
 function addModel(models, value) {
-  const model = clean(value).toUpperCase();
+  const model = clean(value).toUpperCase().replace(/^HD2[\s-]*V3$/, "HD2 V3");
   if (!model || NON_MODEL_WORDS.has(model) || /^V\d/i.test(model)) return;
   if (KNOWN_MODELS.includes(model) || /^[A-Z]{1,8}\d[A-Z0-9-]*$/.test(model)) {
     models.push(model);
@@ -401,7 +401,7 @@ function addModel(models, value) {
 function modelParts(value) {
   const text = clean(value);
   if (!text) return [];
-  const matches = text.match(/[A-Z]+[A-Z0-9]*(?:\/[A-Z0-9]+)?(?:-[A-Z0-9]+)?/gi) || [];
+  const matches = text.match(/\bHD2[\s-]*V3\b|[A-Z]+[A-Z0-9]*(?:\/[A-Z0-9]+)?(?:-[A-Z0-9]+)?/gi) || [];
   const models = [];
   for (const match of matches) {
     const slash = match.match(/^([A-Z]+\d+[A-Z0-9]*?)\/([A-Z][A-Z0-9]*)$/i);
