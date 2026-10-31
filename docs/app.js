@@ -2390,7 +2390,7 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("click", (event) => {
   if (elements.detail.classList.contains("is-hidden")) return;
   if (elements.detail.contains(event.target)) return;
-  if (event.target.closest(".feedback-card, .beta-card, .request-match-picker")) return;
+  if (event.target.closest(".feedback-card, .beta-card, .request-match-picker, .closed-request-link")) return;
   closeDetail();
 });
 
@@ -2557,7 +2557,11 @@ function validateBetaRows(rows) {
 }
 
 async function loadFirmwareRecords() {
-  const rows = await loadSheetRows({ sheetName: FIRMWARE_SHEET_NAME, requiredHeaders: FIRMWARE_REQUIRED_HEADERS });
+  const payload = await callGoogleAppsScript({ action: "getFirmwareRecords" });
+  if (!payload?.ok || !Array.isArray(payload.rows)) {
+    throw new Error(payload?.message || "Unable to refresh Firmware Change Log. Please update the Apps Script deployment.");
+  }
+  const rows = payload.rows;
   const releases = rows
     .map(normalizeFirmwareRow)
     .filter((release) => release.date || release.model || release.version || release.changeLog);
@@ -2709,10 +2713,44 @@ function setActiveView(view) {
   if (view === "beta") {
     refreshBetaRecords({ silent: true, keepDetailOpen: true });
   }
+  if (view === "firmware") refreshFirmwareRecords();
+}
+
+let firmwareRefreshInFlight = null;
+function refreshFirmwareRecords() {
+  if (!canView("firmware")) return Promise.resolve();
+  if (firmwareRefreshInFlight) return firmwareRefreshInFlight;
+  setFirmwareMessage("Syncing Firmware Change Log...");
+  firmwareRefreshInFlight = (async () => {
+    try {
+      const [releases, feedbackRows] = await Promise.all([
+        loadFirmwareRecords(),
+        canView("feedback") ? loadSheetRows({ gid: FEEDBACK_SHEET_GID }) : Promise.resolve(null),
+      ]);
+      state.firmwareRecords = releases;
+      state.firmwareLookup = buildFirmwareLookup(releases);
+      if (feedbackRows) {
+        state.records = feedbackRows.filter((row) => !isFirmwareReleaseLikeFeedbackRow(row)).map(normalizeRow);
+        renderModelOptions();
+        render();
+      }
+      renderFirmwareFilterOptions();
+      renderFirmware();
+    } catch (error) {
+      setFirmwareMessage(error instanceof Error ? error.message : "Firmware sync failed.", true);
+    } finally {
+      firmwareRefreshInFlight = null;
+    }
+  })();
+  return firmwareRefreshInFlight;
 }
 
 function refreshBetaWhenReturningToPage() {
   if (document.visibilityState === "hidden") return;
+  if (state.activeView === "firmware") {
+    refreshFirmwareRecords();
+    return;
+  }
   if (state.activeView !== "beta" || !canView("beta")) return;
   const now = Date.now();
   if (now - state.lastBetaFocusRefreshAt < 1500) return;
@@ -2779,7 +2817,7 @@ elements.firmwareDateTo.addEventListener("change", () => {
   updateFirmwareFilterSummary();
   renderFirmware();
 });
-elements.firmwareRefresh.addEventListener("click", load);
+elements.firmwareRefresh.addEventListener("click", refreshFirmwareRecords);
 elements.firmwareFilterToggle.addEventListener("click", () => {
   toggleModuleFilters("firmware", elements.firmwareFilterBar.classList.contains("is-collapsed"));
 });
